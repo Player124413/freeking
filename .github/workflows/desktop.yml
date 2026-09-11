@@ -39,9 +39,8 @@ jobs:
           cmake -S . -B build -DCMAKE_BUILD_TYPE=Release > configure.log 2>&1
           CODE=$?
           if [ $CODE -ne 0 ]; then
-            tail -60 configure.log | while IFS= read -r line; do
-              echo "::error::configure-tail: $line"
-            done
+            tail -30 configure.log | sed -e 's/%/%25/g' -e 's/\r/%0D/g' | sed ':a;N;$!ba;s/\n/%0A/g' | head -c 6000 > /tmp/cfg_msg.txt
+            echo "::error::configure-tail:%0A$(cat /tmp/cfg_msg.txt)"
             tail -5 configure.log
           exit $CODE
         env:
@@ -54,9 +53,8 @@ jobs:
           cmake --build build --config Release -j > build.log 2>&1
           CODE=$?
           if [ $CODE -ne 0 ]; then
-            tail -60 build.log | while IFS= read -r line; do
-              echo "::error::build-tail: $line"
-            done
+            tail -30 build.log | sed -e 's/%/%25/g' -e 's/\r/%0D/g' | sed ':a;N;$!ba;s/\n/%0A/g' | head -c 6000 > /tmp/bld_msg.txt
+            echo "::error::build-tail:%0A$(cat /tmp/bld_msg.txt)"
             tail -5 build.log
           exit $CODE
         shell: bash
