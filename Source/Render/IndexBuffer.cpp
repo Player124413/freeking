@@ -58,8 +58,10 @@ namespace Freeking
 		case GL_UNSIGNED_INT:
 		case GL_FLOAT:
 			return 4;
+#ifdef GL_DOUBLE
 		case GL_DOUBLE:
 			return 8;
+#endif
 		default:
 			break;
 		}

@@ -4,7 +4,7 @@
 #include "Vector.h"
 #include "Matrix3x3.h"
 #include "Matrix4x4.h"
-#include <glad/gl.h>
+#include "GLCompat.h"
 #include <unordered_map>
 #include <memory>
 
@@ -202,12 +202,21 @@ namespace Freeking
 			{
 				switch (type)
 				{
+#ifndef __ANDROID__
 				case GL_SAMPLER_1D: return Type::Tex1D;
+#endif
 				case GL_SAMPLER_2D: return Type::Tex2D;
 				case GL_SAMPLER_3D: return Type::Tex3D;
+#ifndef __ANDROID__
 				case GL_SAMPLER_BUFFER: return Type::TexBuffer;
 				case GL_INT_SAMPLER_BUFFER: return Type::TexBuffer;
 				case GL_UNSIGNED_INT_SAMPLER_BUFFER: return Type::TexBuffer;
+#else
+				// On GLES the DynamicModel frame data lives in 2D integer
+				// textures (no buffer textures), see TextureBuffer.
+				case GL_INT_SAMPLER_2D: return Type::TexBuffer;
+				case GL_UNSIGNED_INT_SAMPLER_2D: return Type::TexBuffer;
+#endif
 				case GL_SAMPLER_CUBE: return Type::TexCube;
 				}
 
@@ -218,10 +227,16 @@ namespace Freeking
 			{
 				switch (type)
 				{
+#ifndef __ANDROID__
 				case Type::Tex1D: return GL_TEXTURE_1D;
+#endif
 				case Type::Tex2D: return GL_TEXTURE_2D;
 				case Type::Tex3D: return GL_TEXTURE_3D;
+#ifdef __ANDROID__
+				case Type::TexBuffer: return GL_TEXTURE_2D;
+#else
 				case Type::TexBuffer: return GL_TEXTURE_BUFFER;
+#endif
 				case Type::TexCube: return GL_TEXTURE_CUBE_MAP;
 				}
 
@@ -282,7 +297,7 @@ namespace Freeking
 
 			T* GetParameter(int id)
 			{
-				if (id < 0 || id > _parameters.size())
+				if (id < 0 || id >= static_cast<int>(_parameters.size()))
 				{
 					return nullptr;
 				}

@@ -32,11 +32,13 @@ namespace Freeking
 
 		virtual bool FileExists(const std::string& filename) override;
 		virtual std::vector<uint8_t> GetFileData(const std::string& filename) override;
+		virtual void ListFiles(const std::string& prefix, const std::string& extension, std::vector<std::string>& outFiles) override;
 
 	private:
 
 		struct FileItem
 		{
+			std::string name;
 			int offset;
 			int size;
 		};
@@ -44,6 +46,7 @@ namespace Freeking
 		static const int Id = 0x4B434150;
 
 		std::ifstream _stream;
+		// Lower-cased name -> item, so lookups are case-insensitive.
 		std::unordered_map<std::string, FileItem> _fileItems;
 	};
 }

@@ -40,6 +40,14 @@ namespace Freeking
 
 		SetLocalBounds(Vector3f(-16, -24, -16), Vector3f(16, 50, 16));
 
+		if (_meshes.empty() || _shader == nullptr)
+		{
+			// Missing model files: hide instead of crashing.
+			_hidden = true;
+
+			return;
+		}
+
 		for (const auto& frameAnimation : _meshes.front()->GetFrameAnimations())
 		{
 			_animator.AddAnimation(frameAnimation.name, frameAnimation.firstFrame, frameAnimation.numFrames);
@@ -78,10 +86,21 @@ namespace Freeking
 
 				for (const auto& mesh : _meshes)
 				{
+					if (mesh == nullptr)
+					{
+						continue;
+					}
+
 					for (int i = 0; i < mesh->FrameBounds.size(); ++i)
 					{
-						const auto& frameBounds = mesh->FrameBounds.at(i).at(_animator.GetFrame());
-						const auto& nextFrameBounds = mesh->FrameBounds.at(i).at(_animator.GetNextFrame());
+						const auto& bounds = mesh->FrameBounds.at(i);
+						if (bounds.empty())
+						{
+							continue;
+						}
+
+						const auto& frameBounds = bounds.at(_animator.GetFrame() % bounds.size());
+						const auto& nextFrameBounds = bounds.at(_animator.GetNextFrame() % bounds.size());
 						auto boundsMin = Vector3f::Lerp(frameBounds.boundsMin, nextFrameBounds.boundsMin, _animator.GetFrameDelta());
 						auto boundsMax = Vector3f::Lerp(frameBounds.boundsMax, nextFrameBounds.boundsMax, _animator.GetFrameDelta());
 
@@ -96,27 +115,37 @@ namespace Freeking
 
 	void BaseCastEntity::PreRender(bool translucent)
 	{
+		if (_shader == nullptr)
+		{
+			return;
+		}
+
+		(void)translucent;
+
 		_shader->Bind();
-		_shader->SetParameterValue("delta", _animator.GetFrameDelta());
 		_shader->SetParameterValue("modelMatrix", GetTransform());
 		_shader->SetParameterValue("normalBuffer", DynamicModel::GetNormalBuffer().get());
 	}
 
 	void BaseCastEntity::RenderOpaque()
 	{
+		if (_shader == nullptr)
+		{
+			return;
+		}
+
 		for (size_t i = 0; i < _meshes.size(); ++i)
 		{
 			const auto& mesh = _meshes.at(i);
+			if (mesh == nullptr || i >= _meshTextures.size() || _meshTextures.at(i) == nullptr)
+			{
+				continue;
+			}
+
 			const auto& meshTexture = _meshTextures.at(i);
 
 			_shader->SetParameterValue("diffuse", meshTexture.get());
-			_shader->SetParameterValue("frameVertexBuffer", mesh->GetFrameVertexBuffer().get());
-			_shader->SetParameterValue("frames[0].index", (int)(_animator.GetFrame() * mesh->GetFrameVertexCount()));
-			_shader->SetParameterValue("frames[0].translate", mesh->FrameTransforms[_animator.GetFrame()].translate);
-			_shader->SetParameterValue("frames[0].scale", mesh->FrameTransforms[_animator.GetFrame()].scale);
-			_shader->SetParameterValue("frames[1].index", (int)(_animator.GetNextFrame() * mesh->GetFrameVertexCount()));
-			_shader->SetParameterValue("frames[1].translate", mesh->FrameTransforms[_animator.GetNextFrame()].translate);
-			_shader->SetParameterValue("frames[1].scale", mesh->FrameTransforms[_animator.GetNextFrame()].scale);
+			mesh->SetFrameUniforms(_shader.get(), _animator.GetFrame(), _animator.GetNextFrame(), _animator.GetFrameDelta());
 
 			mesh->Draw();
 		}

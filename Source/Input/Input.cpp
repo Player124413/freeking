@@ -96,6 +96,10 @@ namespace Freeking
 		{ SDLK_LGUI, Button::KeyLGUI },
 		{ SDLK_RGUI, Button::KeyRGUI },
 		{ SDLK_APPLICATION, Button::KeyAPP },
+#ifdef SDLK_AC_BACK
+		// Android back button behaves as Escape (opens the pause menu).
+		{ SDLK_AC_BACK, Button::KeyESCAPE },
+#endif
 
 		{ SDLK_UP, Button::KeyUp },
 		{ SDLK_LEFT, Button::KeyLeft },
@@ -155,6 +159,20 @@ namespace Freeking
 		}
 	}
 
+	void Input::InjectButton(Button button, bool down)
+	{
+		if (button != Button::None && button < Button::Count)
+		{
+			UpdateButton(button, down);
+		}
+	}
+
+	void Input::AddMouseDelta(float x, float y)
+	{
+		MouseDeltaX += x;
+		MouseDeltaY += y;
+	}
+
 	void Input::HandleEvent(const SDL_Event& e)
 	{
 		if (e.type == SDL_KEYDOWN || e.type == SDL_KEYUP)
@@ -163,10 +181,26 @@ namespace Freeking
 		}
 		else if (e.type == SDL_MOUSEBUTTONDOWN || e.type == SDL_MOUSEBUTTONUP)
 		{
-			UpdateButton((Button)(e.button.button), (e.button.state == SDL_PRESSED));
+			// Touches also arrive as emulated mouse events; the touch
+			// controls consume the raw finger events instead, so ignore the
+			// emulated copies here to avoid double input.
+			if (e.button.which == SDL_TOUCH_MOUSEID)
+			{
+				return;
+			}
+
+			if (e.button.button >= SDL_BUTTON_LEFT && e.button.button <= SDL_BUTTON_X2)
+			{
+				UpdateButton((Button)(e.button.button), (e.button.state == SDL_PRESSED));
+			}
 		}
 		else if (e.type == SDL_MOUSEMOTION)
 		{
+			if (e.motion.which == SDL_TOUCH_MOUSEID)
+			{
+				return;
+			}
+
 			MouseDeltaX += (float)e.motion.xrel;
 			MouseDeltaY += (float)e.motion.yrel;
 		}

@@ -38,11 +38,30 @@ struct Vertex
 	vec3 normal;
 };
 
+ivec4 FetchFrameVertex(int index)
+{
+#ifdef FREEKING_GLES
+	int x = index - (index / frameVertexTexWidth) * frameVertexTexWidth;
+	return texelFetch(frameVertexBuffer, ivec2(x, index / frameVertexTexWidth), 0);
+#else
+	return texelFetch(frameVertexBuffer, index);
+#endif
+}
+
+vec3 FetchNormal(int index)
+{
+#ifdef FREEKING_GLES
+	return texelFetch(normalBuffer, ivec2(index, 0), 0).rgb;
+#else
+	return texelFetch(normalBuffer, index).rgb;
+#endif
+}
+
 Vertex GetVertex(Frame frame)
 {
-	ivec4 frameVertex = texelFetch(frameVertexBuffer, frame.index + vertexIndex);
+	ivec4 frameVertex = FetchFrameVertex(frame.index + vertexIndex);
 	vec3 position = ((frameVertex.rgb + vec3(128)) * frame.scale) + frame.translate;
-	vec3 normal = texelFetch(normalBuffer, frameVertex.a + 128).rgb;
+	vec3 normal = FetchNormal(frameVertex.a + 128);
 
 	Vertex vertex;
 	vertex.position = vec3(position.x, position.z, -position.y);

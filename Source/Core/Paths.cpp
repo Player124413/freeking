@@ -6,8 +6,34 @@
 #include <winreg.h>
 #endif
 
+#ifdef __ANDROID__
+#include <SDL_system.h>
+#endif
+
 namespace Freeking
 {
+#ifdef __ANDROID__
+	static std::filesystem::path AndroidInternalStorage()
+	{
+		if (const char* path = SDL_AndroidGetInternalStoragePath())
+		{
+			return std::filesystem::path(path);
+		}
+
+		return {};
+	}
+
+	static std::filesystem::path AndroidExternalStorage()
+	{
+		if (const char* path = SDL_AndroidGetExternalStoragePath())
+		{
+			return std::filesystem::path(path);
+		}
+
+		return {};
+	}
+#endif
+
 	std::filesystem::path Paths::SteamDir()
 	{
 		static std::filesystem::path dir;
@@ -118,5 +144,41 @@ namespace Freeking
 		}
 
 		return {};
+	}
+
+	std::filesystem::path Paths::AssetsDir()
+	{
+#ifdef __ANDROID__
+		// Copied out of the APK by the launcher on first run.
+		auto internal = AndroidInternalStorage();
+		if (!internal.empty())
+		{
+			return internal / "Assets";
+		}
+
+		return {};
+#else
+		std::error_code ec;
+		return std::filesystem::current_path(ec) / "Assets";
+#endif
+	}
+
+	std::filesystem::path Paths::UserDir()
+	{
+#ifdef __ANDROID__
+		auto internal = AndroidInternalStorage();
+		if (!internal.empty())
+		{
+			return internal;
+		}
+
+		return {};
+#else
+		std::error_code ec;
+		auto dir = std::filesystem::current_path(ec) / "user";
+		std::filesystem::create_directories(dir, ec);
+
+		return dir;
+#endif
 	}
 }

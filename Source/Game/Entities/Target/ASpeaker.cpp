@@ -22,14 +22,12 @@ namespace Freeking::Entity::Target
 		auto noisePath = std::filesystem::path("sound") / _noise;
 		noisePath.replace_extension("wav");
 
-		if (const auto& audioClip = AudioClip::Library.Get(noisePath.string()))
+		_audioClip = AudioClip::Library.Get(noisePath.string());
+		if (_audioClip != nullptr)
 		{
-			if (_audioClip = audioClip.get(); _audioClip)
+			if (_spawnFlags[SpawnFlags::LoopedOn])
 			{
-				if (_spawnFlags[SpawnFlags::LoopedOn])
-				{
-					AudioDevice::Current->Play(_audioClip, GetPosition(), true, false, true);
-				}
+				AudioDevice::Current->Play(_audioClip, GetPosition(), true, false, true);
 			}
 		}
 	}

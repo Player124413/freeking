@@ -35,7 +35,7 @@ namespace Freeking
 					{
 						face.width = imageWidth;
 						face.height = imageHeight;
-						face.internalFormat = GL_RGBA8;
+						face.internalFormat = imageChannels == 3 ? GL_RGB8 : GL_RGBA8;
 						face.format = imageChannels == 3 ? GL_RGB : GL_RGBA;
 						face.type = GL_UNSIGNED_BYTE;
 						face.data.assign(image, image + (imageWidth * imageHeight) * imageChannels);

@@ -7,14 +7,83 @@
 #include "Paths.h"
 #include "Profiler.h"
 #include "LineRenderer.h"
+#include "Renderer.h"
 #include "Util.h"
 #include "ThirdParty/rectpack2d/finders_interface.h"
 #include <array>
+#include <cmath>
+#include <limits>
+#include <cstring>
 
 namespace Freeking
 {
+	Frustum BrushModel::CullFrustum;
+	bool BrushModel::CullEnabled = true;
+
+	Frustum Frustum::FromViewProjection(const Matrix4x4& viewProjection)
+	{
+		Frustum frustum;
+
+		Vector4f rows[4] =
+		{
+			viewProjection.Row(0),
+			viewProjection.Row(1),
+			viewProjection.Row(2),
+			viewProjection.Row(3)
+		};
+
+		Vector4f raw[6];
+		for (int i = 0; i < 3; ++i)
+		{
+			raw[i * 2] = Vector4f(
+				rows[3].x + rows[i].x,
+				rows[3].y + rows[i].y,
+				rows[3].z + rows[i].z,
+				rows[3].w + rows[i].w);
+			raw[i * 2 + 1] = Vector4f(
+				rows[3].x - rows[i].x,
+				rows[3].y - rows[i].y,
+				rows[3].z - rows[i].z,
+				rows[3].w - rows[i].w);
+		}
+
+		for (int i = 0; i < 6; ++i)
+		{
+			float length = std::sqrt(raw[i].x * raw[i].x + raw[i].y * raw[i].y + raw[i].z * raw[i].z);
+			frustum.Planes[i] = (length > 0.00001f) ? (raw[i] * (1.0f / length)) : raw[i];
+		}
+
+		return frustum;
+	}
+
+	bool Frustum::IntersectsAABB(const Vector3f& mins, const Vector3f& maxs) const
+	{
+		for (int i = 0; i < 6; ++i)
+		{
+			const Vector4f& plane = Planes[i];
+
+			// Negative vertex: if it is outside, the whole box is outside.
+			Vector3f n(
+				plane.x >= 0.0f ? mins.x : maxs.x,
+				plane.y >= 0.0f ? mins.y : maxs.y,
+				plane.z >= 0.0f ? mins.z : maxs.z);
+
+			if (plane.x * n.x + plane.y * n.y + plane.z * n.z + plane.w < 0.0f)
+			{
+				return false;
+			}
+		}
+
+		return true;
+	}
+
 	void BrushMesh::Draw()
 	{
+		if (!_vertexBinding)
+		{
+			return;
+		}
+
 		_vertexBinding->Bind();
 		glDrawElements(GL_TRIANGLES, _vertexBinding->GetNumElements(), GL_UNSIGNED_INT, (void*)0);
 		_vertexBinding->Unbind();
@@ -25,6 +94,25 @@ namespace Freeking
 		if (Vertices.empty() || Indices.empty())
 		{
 			return;
+		}
+
+		BoundsMin = Vector3f(
+			std::numeric_limits<float>::max(),
+			std::numeric_limits<float>::max(),
+			std::numeric_limits<float>::max());
+		BoundsMax = Vector3f(
+			std::numeric_limits<float>::lowest(),
+			std::numeric_limits<float>::lowest(),
+			std::numeric_limits<float>::lowest());
+
+		for (const auto& vertex : Vertices)
+		{
+			BoundsMin.x = Math::Min(BoundsMin.x, vertex.Position.x);
+			BoundsMin.y = Math::Min(BoundsMin.y, vertex.Position.y);
+			BoundsMin.z = Math::Min(BoundsMin.z, vertex.Position.z);
+			BoundsMax.x = Math::Max(BoundsMax.x, vertex.Position.x);
+			BoundsMax.y = Math::Max(BoundsMax.y, vertex.Position.y);
+			BoundsMax.z = Math::Max(BoundsMax.z, vertex.Position.z);
 		}
 
 		static const int vertexSize = sizeof(Vertex);
@@ -206,6 +294,14 @@ namespace Freeking
 				continue;
 			}
 
+			// World-model mesh frustum culling (mesh bounds are world-space
+			// for model 0). Skips off-screen draw calls on weak GPUs.
+			if (CullEnabled && Cullable && mesh.second->GetNumVertices() > 0 &&
+				!CullFrustum.IntersectsAABB(mesh.second->BoundsMin, mesh.second->BoundsMax))
+			{
+				continue;
+			}
+
 			float brightness = Map::LightStyles.GetSample(mesh.second->LightStyles[1]);
 			shader->SetParameterValue("brightness", brightness * 2.0f);
 			shader->SetParameterValue("alphaCutOff", mesh.second->AlphaCutOff);
@@ -226,6 +322,12 @@ namespace Freeking
 		for (auto& mesh : Meshes)
 		{
 			if (!mesh.second->Translucent && !forceTranslucent)
+			{
+				continue;
+			}
+
+			if (CullEnabled && Cullable && mesh.second->GetNumVertices() > 0 &&
+				!CullFrustum.IntersectsAABB(mesh.second->BoundsMin, mesh.second->BoundsMax))
 			{
 				continue;
 			}
@@ -254,6 +356,8 @@ namespace Freeking
 
 	void Map::Render()
 	{
+		BrushModel::CullFrustum = Frustum::FromViewProjection(Renderer::ProjectionMatrix * Renderer::ViewMatrix);
+
 		glDisable(GL_BLEND);
 
 		for (const auto& entity : _worldEntities)
@@ -290,8 +394,19 @@ namespace Freeking
 		return LightStyles.GetSample(index);
 	}
 
+	Map::~Map()
+	{
+		if (Map::Current == this)
+		{
+			Map::Current = nullptr;
+		}
+	}
+
 	Map::Map(const std::string& mapName)
 	{
+		// Entities created below resolve brush models through Map::Current
+		// during Initialize(), so publish early. Game::UnloadMap clears it
+		// again if the load throws before completing.
 		Map::Current = this;
 
 		for (const auto& l : lightSequences)
@@ -343,7 +458,14 @@ namespace Freeking
 			{
 				auto path = "textures/" + (textureName + std::string(".tga"));
 				textureIds.emplace(textureName, static_cast<uint32_t>(_textures.size()));
-				_textures.push_back(Texture2D::Library.Get(path));
+
+				auto texture = Texture2D::Library.Get(path);
+				if (texture == nullptr)
+				{
+					texture = Texture2D::GetFallback();
+				}
+
+				_textures.push_back(texture);
 			}
 		}
 
@@ -366,6 +488,8 @@ namespace Freeking
 			brushModel->BoundsMin = Vector3f(Math::Min(boundsMin.x, boundsMax.x), Math::Min(boundsMin.y, boundsMax.y), Math::Min(boundsMin.z, boundsMax.z));
 			brushModel->BoundsMax = Vector3f(Math::Max(boundsMin.x, boundsMax.x), Math::Max(boundsMin.y, boundsMax.y), Math::Max(boundsMin.z, boundsMax.z));
 			brushModel->Origin = Vector3f(model.Origin.x, model.Origin.z, -model.Origin.y);
+			// Model 0 is always the static world geometry.
+			brushModel->Cullable = (modelIndex == 0);
 
 			for (int faceIndex = model.FirstFace; faceIndex < (model.FirstFace + model.NumFaces); ++faceIndex)
 			{
@@ -428,10 +552,28 @@ namespace Freeking
 				std::vector<Vector2f> faceUVs;
 				faceUVs.resize(face.NumEdges);
 
+				bool faceValid = true;
 				for (int edgeIndex = 0; edgeIndex < face.NumEdges; ++edgeIndex)
 				{
 					const auto& faceEdge = faceEdges[face.FirstEdge + edgeIndex];
-					const auto& v0 = vertices[faceEdge < 0 ? edges[-faceEdge].A : edges[faceEdge].B];
+					int edgeAbs = faceEdge < 0 ? -faceEdge : faceEdge;
+					if (!edges.IsValidIndex(edgeAbs))
+					{
+						faceValid = false;
+
+						break;
+					}
+
+					const auto& edge = edges[edgeAbs];
+					int vertIndex = faceEdge < 0 ? edge.A : edge.B;
+					if (!vertices.IsValidIndex(vertIndex))
+					{
+						faceValid = false;
+
+						break;
+					}
+
+					const auto& v0 = vertices[vertIndex];
 					Vector3f position(v0.x, v0.z, -v0.y);
 
 					const auto& plane = planes[face.Plane];
@@ -451,6 +593,11 @@ namespace Freeking
 					v /= (float)textureHeight;
 
 					faceVertices[edgeIndex] = { position, normal, { Vector2f(u, v), 0, 0 } };
+				}
+
+				if (!faceValid)
+				{
+					continue;
 				}
 
 				{
@@ -559,21 +706,28 @@ namespace Freeking
 
 			if (auto newEntity = BaseEntity::Make(classname))
 			{
-				if (const auto& targetname = entityProperties.GetTargetnameProperty())
+				try
 				{
-					_targetEntities[targetname].push_back(newEntity);
+					if (const auto& targetname = entityProperties.GetTargetnameProperty())
+					{
+						_targetEntities[targetname].push_back(newEntity);
+					}
+
+					newEntity->InitializeProperties(entityProperties);
+					newEntity->Initialize();
+					newEntity->PostInitialize();
+					newEntity->Spawn();
+
+					_entities.push_back(newEntity);
+
+					if (auto worldEntity = std::dynamic_pointer_cast<PrimitiveEntity>(newEntity))
+					{
+						_worldEntities.push_back(worldEntity);
+					}
 				}
-
-				newEntity->InitializeProperties(entityProperties);
-				newEntity->Initialize();
-				newEntity->PostInitialize();
-				newEntity->Spawn();
-
-				_entities.push_back(newEntity);
-
-				if (auto worldEntity = std::dynamic_pointer_cast<PrimitiveEntity>(newEntity))
+				catch (const std::exception& e)
 				{
-					_worldEntities.push_back(worldEntity);
+					std::cout << "Skipping broken entity \"" << classname << "\": " << e.what() << std::endl;
 				}
 			}
 			else
@@ -583,6 +737,7 @@ namespace Freeking
 		}
 
 		pf.Stop("Create entities");
+
 	}
 
 	std::vector<std::shared_ptr<BaseEntity>> Map::GetTargetEntities(const std::string& targetName)
@@ -609,9 +764,19 @@ namespace Freeking
 			return;
 		}
 
+		if (!_nodes.IsValidIndex(num))
+		{
+			return;
+		}
+
 		float t1, t2, offset;
 
 		const BspNode& node = _nodes[num];
+		if (!_planes.IsValidIndex(node.PlaneNum))
+		{
+			return;
+		}
+
 		const BspPlane& plane = _planes[node.PlaneNum];
 
 		if (plane.Type < 3)
@@ -719,6 +884,11 @@ namespace Freeking
 
 	void Map::TraceToLeaf(const Vector3f& mins, const Vector3f& maxs, TraceResult& trace, bool isPoint, int leafIndex, const BspContentFlags& contents)
 	{
+		if (!_leafs.IsValidIndex(leafIndex))
+		{
+			return;
+		}
+
 		const BspLeaf& leaf = _leafs[leafIndex];
 
 		if (!leaf.Contents[contents])
@@ -728,7 +898,18 @@ namespace Freeking
 
 		for (int k = 0; k < leaf.NumLeafBrushes; k++)
 		{
-			const BspBrush& brush = _brushes[_leafBrushes[leaf.FirstLeafBrush + k]];
+			int leafBrushIndex = leaf.FirstLeafBrush + k;
+			if (!_leafBrushes.IsValidIndex(leafBrushIndex))
+			{
+				break;
+			}
+
+			if (!_brushes.IsValidIndex(_leafBrushes[leafBrushIndex]))
+			{
+				continue;
+			}
+
+			const BspBrush& brush = _brushes[_leafBrushes[leafBrushIndex]];
 
 			if (!brush.Contents[contents])
 			{

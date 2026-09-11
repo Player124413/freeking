@@ -53,14 +53,14 @@ namespace Freeking
 		_open = true;
 		_timeToClose = Time::Now() + _wait;
 
-		AudioDevice::Current->Play(AudioClip::Library.Get("sound/world/doors/dr5_strt.wav").get(), GetTransformCenter().Translation());
+		AudioDevice::Current->Play(AudioClip::Library.Get("sound/world/doors/dr5_strt.wav"), GetTransformCenter().Translation());
 	}
 
 	void DoorEntity::Close()
 	{
 		_open = false;
 
-		AudioDevice::Current->Play(AudioClip::Library.Get("sound/world/doors/dr5_strt.wav").get(), GetTransformCenter().Translation());
+		AudioDevice::Current->Play(AudioClip::Library.Get("sound/world/doors/dr5_strt.wav"), GetTransformCenter().Translation());
 	}
 
 	bool DoorEntity::SetProperty(const EntityProperty& property)

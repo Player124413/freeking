@@ -1,4 +1,5 @@
-﻿#include "Shader.h"
+#include "Shader.h"
+#include <cstring>
 #include "Texture2D.h"
 #include "TextureBuffer.h"
 #include "TextureCube.h"
@@ -447,7 +448,14 @@ namespace Freeking
 
 	void Shader::TextureParameter::SetTexture(const TextureBuffer* texture)
 	{
+#ifdef __ANDROID__
+		// On GLES the normal table is a plain 2D float texture sampled as
+		// sampler2D while the frame data is an integer 2D texture sampled as
+		// isampler2D; both are TextureBuffer objects, so accept either type.
+		if ((type == Type::TexBuffer || type == Type::Tex2D) && texture)
+#else
 		if (type == Type::TexBuffer && texture)
+#endif
 		{
 			textureId = texture->GetId();
 			samplerId = GL_INVALID_INDEX;
@@ -495,9 +503,22 @@ namespace Freeking
 	{
 		GLuint shader = glCreateShader(type);
 
+#ifdef __ANDROID__
+		// OpenGL ES 3.0 shading language. Default float/int precision is
+		// mandatory in fragment shaders, harmless in vertex shaders.
+		static const std::string version(
+			"#version 300 es\n"
+			"precision highp float;\n"
+			"precision highp int;\n");
+		static const std::string platformDefines("#define FREEKING_GLES\n");
+		const std::string fullDefines = platformDefines + defines;
+		const GLchar* sources[] = { version.c_str(), fullDefines.c_str(), source.c_str() };
+		const GLint lengths[] = { (GLint)version.size(), (GLint)fullDefines.size(), (GLint)source.size() };
+#else
 		static const std::string version("#version 460\n");
 		const GLchar* sources[] = { version.c_str(), defines.c_str(), source.c_str() };
 		const GLint lengths[] = { (GLint)version.size(), (GLint)defines.size(), (GLint)source.size() };
+#endif
 		glShaderSource(shader, 3, sources, lengths);
 		glCompileShader(shader);
 
@@ -531,7 +552,15 @@ namespace Freeking
 		GLuint vertexShader = CreateSubShader(GL_VERTEX_SHADER, source.c_str(), "#define VERTEX\n");
 		GLuint fragmentShader = CreateSubShader(GL_FRAGMENT_SHADER, source.c_str(), "#define FRAGMENT\n");
 
-		assert(vertexShader != 0 && fragmentShader != 0);
+		if (vertexShader == 0 || fragmentShader == 0)
+		{
+			if (vertexShader != 0) glDeleteShader(vertexShader);
+			if (fragmentShader != 0) glDeleteShader(fragmentShader);
+			glDeleteProgram(_program);
+			_program = 0;
+
+			return;
+		}
 
 		glAttachShader(_program, vertexShader);
 		glAttachShader(_program, fragmentShader);
@@ -566,11 +595,11 @@ namespace Freeking
 		glGetProgramiv(_program, GL_ACTIVE_UNIFORM_BLOCKS, &uniformBlockCount);
 		for (int i = 0; i < uniformBlockCount; i++)
 		{
-			int length​ = -1;
-			char uniformBlockName​[64];
-			glGetActiveUniformBlockName(_program, GLuint(i), sizeof(uniformBlockName​) - 1, &length​, uniformBlockName​);
-			uniformBlockName​[length​] = 0;
-			auto nameString = std::string(uniformBlockName​);
+			int length = -1;
+			char uniformBlockName[64];
+			glGetActiveUniformBlockName(_program, GLuint(i), sizeof(uniformBlockName) - 1, &length, uniformBlockName);
+			uniformBlockName[length] = 0;
+			auto nameString = std::string(uniformBlockName);
 
 			if (nameString == "GlobalUniforms")
 			{

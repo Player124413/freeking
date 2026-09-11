@@ -13,9 +13,31 @@ namespace Freeking
 
 	DynamicModelLibrary DynamicModel::Library;
 
-	const std::unique_ptr<TextureBuffer>& DynamicModel::GetNormalBuffer()
+	const std::shared_ptr<TextureBuffer>& DynamicModel::GetNormalBuffer()
 	{
-		static auto normalBuffer = std::make_unique<TextureBuffer>((void*)&NormalTable[0][0], (162 * 3) * sizeof(float), GL_RGB32F);
+#ifdef __ANDROID__
+		// 256x1 RGBA32F 2D texture; indices 162..255 are padding (the MD2/MDX
+		// normal table has 162 entries, loaders store index-128 as int8 so
+		// shader-side "n + 128" always lands in [0, 161]).
+		static auto normalBuffer = []
+		{
+			float data[256 * 4] = {};
+			for (int i = 0; i < 162; ++i)
+			{
+				data[i * 4 + 0] = NormalTable[i][0];
+				data[i * 4 + 1] = NormalTable[i][1];
+				data[i * 4 + 2] = NormalTable[i][2];
+				data[i * 4 + 3] = 0.0f;
+			}
+			for (int i = 162; i < 256; ++i)
+			{
+				data[i * 4 + 1] = 1.0f;
+			}
+			return TextureBuffer::CreateFloat4(256, 1, data);
+		}();
+#else
+		static auto normalBuffer = std::make_shared<TextureBuffer>((void*)&NormalTable[0][0], (162 * 3) * sizeof(float), GL_RGB32F);
+#endif
 		return normalBuffer;
 	}
 
@@ -49,7 +71,14 @@ namespace Freeking
 
 		_indexBuffer = std::make_unique<IndexBuffer>(Indices.data(), Indices.size(), GL_UNSIGNED_INT);
 		_vertexBuffer = std::make_unique<VertexBuffer>(Vertices.data(), Vertices.size(), vertexSize, GL_STATIC_DRAW);
+#ifdef __ANDROID__
+		_frameVertexBuffer = TextureBuffer::CreateByte4(
+			static_cast<int>(_frameVertexCount),
+			static_cast<int>(_frameCount),
+			FrameVertices.data());
+#else
 		_frameVertexBuffer = std::make_unique<TextureBuffer>(FrameVertices.data(), FrameVertices.size() * sizeof(FrameVertex), GL_RGBA8I);
+#endif
 
 		ArrayElement vertexLayout[] =
 		{
@@ -99,8 +128,18 @@ namespace Freeking
 
 	void FrameAnimator::Tick(double dt)
 	{
+		if (_animations.empty() || _currentAnimation >= _animations.size())
+		{
+			return;
+		}
+
 		const auto& animation = _animations.at(_currentAnimation);
 		auto frameCount = animation.numFrames;
+
+		if (frameCount == 0)
+		{
+			return;
+		}
 
 		_playTime += (10.0 * dt);
 		_playTime = fmod(_playTime, (float)frameCount);
@@ -136,5 +175,25 @@ namespace Freeking
 		_frame = 0;
 		_nextFrame = 0;
 		_frameDelta = 0;
+	}
+
+	void DynamicModel::SetFrameUniforms(Shader* shader, size_t frame, size_t nextFrame, float delta) const
+	{
+		if (shader == nullptr || FrameTransforms.empty())
+		{
+			return;
+		}
+
+		frame %= FrameTransforms.size();
+		nextFrame %= FrameTransforms.size();
+
+		shader->SetParameterValue("delta", delta);
+		shader->SetParameterValue("frameVertexBuffer", GetFrameVertexBuffer().get());
+		shader->SetParameterValue("frames[0].index", static_cast<int>(frame * GetFrameVertexCount()));
+		shader->SetParameterValue("frames[0].translate", FrameTransforms[frame].translate);
+		shader->SetParameterValue("frames[0].scale", FrameTransforms[frame].scale);
+		shader->SetParameterValue("frames[1].index", static_cast<int>(nextFrame * GetFrameVertexCount()));
+		shader->SetParameterValue("frames[1].translate", FrameTransforms[nextFrame].translate);
+		shader->SetParameterValue("frames[1].scale", FrameTransforms[nextFrame].scale);
 	}
 }

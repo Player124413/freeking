@@ -56,6 +56,11 @@ namespace Freeking
 		static float GetMouseDeltaY();
 		static Vector2i GetMousePosition();
 
+		// Virtual input injection, used by the touch controls to drive the
+		// same code paths as the physical keyboard/mouse.
+		static void InjectButton(Button button, bool down);
+		static void AddMouseDelta(float x, float y);
+
 		template <class Instance, typename Callback>
 		static void CaptureTextEntry(Instance* instance, Callback callback)
 		{

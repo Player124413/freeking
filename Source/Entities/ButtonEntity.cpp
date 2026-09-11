@@ -53,7 +53,7 @@ namespace Freeking
 		_pressed = true;
 		_timeToUnpress = Time::Now() + 3.0;
 
-		AudioDevice::Current->Play(AudioClip::Library.Get("sound/world/switches/wheel.wav").get(), GetTransformCenter().Translation());
+		AudioDevice::Current->Play(AudioClip::Library.Get("sound/world/switches/wheel.wav"), GetTransformCenter().Translation());
 	}
 
 	bool ButtonEntity::SetProperty(const EntityProperty& property)

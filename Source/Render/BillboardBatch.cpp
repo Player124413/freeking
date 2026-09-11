@@ -5,7 +5,7 @@
 #include "Shader.h"
 #include "Texture2D.h"
 #include "Map.h"
-#include "Math.h"
+#include "Maths.h"
 #include <array>
 
 namespace Freeking

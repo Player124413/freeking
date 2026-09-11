@@ -38,6 +38,20 @@ namespace Freeking
 
 			if (offset > 0)
 			{
+#ifdef __ANDROID__
+				// GLES has no BaseVertex variants; approximate with an index
+				// buffer byte offset (this helper is not used on the hot path).
+				size_t indexSize = (indexType == GL_UNSIGNED_SHORT) ? 2 : ((indexType == GL_UNSIGNED_BYTE) ? 1 : 4);
+				const void* byteOffset = reinterpret_cast<const void*>(static_cast<intptr_t>(offset) * static_cast<intptr_t>(indexSize));
+				if (instances > 1)
+				{
+					glDrawElementsInstanced(mode, count, indexType, byteOffset, instances);
+				}
+				else
+				{
+					glDrawElements(mode, count, indexType, byteOffset);
+				}
+#else
 				if (instances > 1)
 				{
 					glDrawElementsInstancedBaseVertex(mode, count, indexType, nullptr, instances, offset);
@@ -46,6 +60,7 @@ namespace Freeking
 				{
 					glDrawElementsBaseVertex(mode, count, indexType, nullptr, offset);
 				}
+#endif
 			}
 			else
 			{

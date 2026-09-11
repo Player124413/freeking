@@ -51,12 +51,14 @@ namespace Freeking
 		case GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT:
 			std::cout << "GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT" << std::endl;
 			break;
+#ifndef __ANDROID__
 		case GL_FRAMEBUFFER_INCOMPLETE_DIMENSIONS_EXT:
 			std::cout << "GL_FRAMEBUFFER_INCOMPLETE_DIMENSIONS_EXT" << std::endl;
 			break;
 		case GL_FRAMEBUFFER_INCOMPLETE_FORMATS_EXT:
 			std::cout << "GL_FRAMEBUFFER_INCOMPLETE_FORMATS_EXT" << std::endl;
 			break;
+#endif
 		case GL_FRAMEBUFFER_INCOMPLETE_DRAW_BUFFER:
 			std::cout << "GL_FRAMEBUFFER_INCOMPLETE_DRAW_BUFFER" << std::endl;
 			break;

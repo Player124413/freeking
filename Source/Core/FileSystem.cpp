@@ -1,6 +1,8 @@
 #include "FileSystem.h"
 #include <filesystem>
 #include <fstream>
+#include <cctype>
+#include <algorithm>
 
 namespace Freeking
 {
@@ -38,5 +40,30 @@ namespace Freeking
 		}
 
 		return {};
+	}
+
+	std::vector<std::string> FileSystem::ListFiles(const std::string& prefix, const std::string& extension)
+	{
+		std::vector<std::string> files;
+
+		for (const auto& fileSystem : _fileSystems)
+		{
+			fileSystem->ListFiles(prefix, extension, files);
+		}
+
+		std::sort(files.begin(), files.end());
+		files.erase(std::unique(files.begin(), files.end()), files.end());
+
+		return files;
+	}
+
+	std::string FileSystem::ToLower(std::string s)
+	{
+		for (auto& c : s)
+		{
+			c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+		}
+
+		return s;
 	}
 }

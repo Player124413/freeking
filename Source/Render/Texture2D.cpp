@@ -1,7 +1,9 @@
 #include "Texture2D.h"
+#include <cstring>
 #include "TextureLoader.h"
 #include "ThirdParty/stb/stb_image.h"
 #include <algorithm>
+#include <vector>
 
 namespace Freeking
 {
@@ -11,6 +13,30 @@ namespace Freeking
 	}
 
 	TextureLibrary Texture2D::Library;
+
+	std::shared_ptr<Texture2D> Texture2D::GetFallback()
+	{
+		static std::shared_ptr<Texture2D> fallback;
+		if (!fallback)
+		{
+			const int size = 64;
+			std::vector<uint8_t> pixels(size * size * 4);
+			for (int y = 0; y < size; ++y)
+			{
+				for (int x = 0; x < size; ++x)
+				{
+					bool odd = ((x / 8) + (y / 8)) % 2 == 0;
+					uint8_t* p = &pixels[(y * size + x) * 4];
+					p[0] = odd ? 255 : 0;
+					p[1] = 0;
+					p[2] = odd ? 255 : 0;
+					p[3] = 255;
+				}
+			}
+			fallback = std::make_shared<Texture2D>(size, size, GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
+		}
+		return fallback;
+	}
 
 	Texture2D::Texture2D(GLsizei width, GLsizei height, GLenum internalFormat, GLenum format, GLenum type, const void* data) :
 		_width(width),
@@ -35,7 +61,7 @@ namespace Freeking
 	Texture2D::Texture2D(GLsizei width, GLsizei height, uint8_t r, uint8_t g, uint8_t b) :
 		_width(width),
 		_height(height),
-		_internalFormat(GL_RGBA8),
+		_internalFormat(GL_RGB8),
 		_format(GL_RGB),
 		_type(GL_UNSIGNED_BYTE),
 		_id(0)

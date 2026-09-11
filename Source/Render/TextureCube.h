@@ -4,7 +4,7 @@
 #include "AssetLibrary.h"
 #include <array>
 #include <vector>
-#include <glad/gl.h>
+#include "GLCompat.h"
 
 namespace Freeking
 {

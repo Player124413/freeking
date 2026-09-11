@@ -100,6 +100,11 @@ namespace Freeking
 		void DrawSubObject(int index);
 		void Commit();
 
+		// Binds per-frame interpolation uniforms (delta, frames[0..1], frame
+		// vertex storage). Frame indices are wrapped safely, calling this
+		// with a model that has no frames is a no-op instead of a crash.
+		void SetFrameUniforms(Shader* shader, size_t frame, size_t nextFrame, float delta) const;
+
 		inline uint32_t GetFrameCount() const { return _frameCount; }
 		inline uint32_t GetFrameVertexCount() const { return _frameVertexCount; }
 		inline void SetFrameCount(uint32_t frameCount) { _frameCount = frameCount; }
@@ -107,7 +112,7 @@ namespace Freeking
 
 		inline const std::unique_ptr<VertexBinding>& GetBinding() const { return _vertexBinding; }
 		inline const std::shared_ptr<TextureBuffer>& GetFrameVertexBuffer() const { return _frameVertexBuffer; }
-		static const std::unique_ptr<TextureBuffer>& GetNormalBuffer();
+		static const std::shared_ptr<TextureBuffer>& GetNormalBuffer();
 
 		std::vector<FrameAnimation> GetFrameAnimations() const;
 

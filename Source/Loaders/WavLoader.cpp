@@ -1,5 +1,6 @@
 #include "WavLoader.h"
 #include "MemoryStream.h"
+#include <cstring>
 
 namespace Freeking
 {

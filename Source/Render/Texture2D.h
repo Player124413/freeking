@@ -2,7 +2,7 @@
 
 #include "Texture.h"
 #include "AssetLibrary.h"
-#include <glad/gl.h>
+#include "GLCompat.h"
 
 namespace Freeking
 {
@@ -20,6 +20,11 @@ namespace Freeking
 	public:
 
 		static TextureLibrary Library;
+
+		// Shared magenta/black checker used instead of a nullptr whenever a
+		// texture asset is missing, so broken installs degrade visually
+		// instead of crashing.
+		static std::shared_ptr<Texture2D> GetFallback();
 
 		Texture2D() = delete;
 		Texture2D(GLsizei width, GLsizei height, GLenum internalFormat, GLenum format, GLenum type, const void* data);

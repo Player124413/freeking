@@ -2,7 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
-#include <glad/gl.h>
+#include "GLCompat.h"
 
 namespace Freeking
 {

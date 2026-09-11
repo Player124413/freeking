@@ -40,6 +40,18 @@ namespace Freeking
 		UpdateTransform();
 	}
 
+	void FreeCamera::Teleport(const Vector3f& feetPosition, float yawDegrees)
+	{
+		// The movement origin sits 72 units above the feet (player box is
+		// mins -72 / maxs 0 on Y).
+		_movementPosition = feetPosition + Vector3f(0, 72, 0);
+		_movementVelocity = Vector3f(0, 0, 0);
+		_prevPitch = 0.0f;
+		_prevYaw = yawDegrees;
+		SetRotation(0.0f, yawDegrees, 0.0f);
+		UpdateTransform();
+	}
+
 	static float CalculateEyeRoll(const Vector3f& velocity, const Vector3f& right, float rollSpeed, float rollAngle)
 	{
 		float side = Vector3f::Dot(velocity, right);
@@ -123,12 +135,18 @@ namespace Freeking
 			isGrounded = false;
 			isWalking = false;
 
-			AudioDevice::Current->Play(AudioClip::Library.Get("sound/actors/player/male/jump" + std::to_string(Util::RandomInt(1, 3)) + ".wav").get(), 0, false, true);
+			if (AudioDevice::Current != nullptr)
+			{
+				AudioDevice::Current->Play(AudioClip::Library.Get("sound/actors/player/male/jump" + std::to_string(Util::RandomInt(1, 3)) + ".wav"), 0, false, true);
+			}
 		}
 
 		if (Input::JustPressed(Button::KeyF))
 		{
-			AudioDevice::Current->Play(AudioClip::Library.Get("sound/actors/player/male/profanity/level2/cuss2-" + std::to_string(Util::RandomInt(1, 17)) + ".wav").get(), 0, false, true);
+			if (AudioDevice::Current != nullptr)
+			{
+				AudioDevice::Current->Play(AudioClip::Library.Get("sound/actors/player/male/profanity/level2/cuss2-" + std::to_string(Util::RandomInt(1, 17)) + ".wav"), 0, false, true);
+			}
 		}
 
 		if (!isWalking)

@@ -28,6 +28,10 @@ namespace Freeking
 		virtual void TakeDamage();
 		virtual void Trigger();
 
+		const std::string& GetClassname() const { return _classname; }
+		const std::string& GetTargetName() const { return _targetname; }
+		const std::string& GetTarget() const { return _target; }
+
 		static SharedPtr Make(const std::string_view& classname);
 
 	protected:

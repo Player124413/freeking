@@ -92,3 +92,11 @@ namespace ImGui
     void MyFunction(const char* name, const MyMatrix44& v);
 }
 */
+
+// Freeking: on Android, OpenGL ES 3.0 entry points link directly from the
+// NDK (there is no desktop GL loader library). Satisfy the OpenGL3 backend
+// header's loader check; imgui_impl_opengl3.cpp undefines all loaders on
+// the auto-detected ES3 path anyway and includes <GLES3/gl3.h> itself.
+#ifdef __ANDROID__
+#define IMGUI_IMPL_OPENGL_LOADER_CUSTOM <GLES3/gl3.h>
+#endif

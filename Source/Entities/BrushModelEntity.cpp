@@ -113,11 +113,17 @@ namespace Freeking
 
 	void BrushModelEntity::Trace(const Vector3f& start, const Vector3f& end, const Vector3f& mins, const Vector3f& maxs, TraceResult& trace, const BspContentFlags& brushMask)
 	{
-		if (_modelIndex == 0 || _hidden)
+		if (_modelIndex == 0 || _hidden || _model == nullptr || Map::Current == nullptr)
 		{
 			return;
 		}
 
-		trace = Map::Current->TransformedBoxTrace(start, end, mins, maxs, Map::Current->GetModelHeadNode(_modelIndex), brushMask, GetPosition(), GetRotation());
+		int headNode = Map::Current->GetModelHeadNode(_modelIndex);
+		if (headNode < 0)
+		{
+			return;
+		}
+
+		trace = Map::Current->TransformedBoxTrace(start, end, mins, maxs, headNode, brushMask, GetPosition(), GetRotation());
 	}
 }

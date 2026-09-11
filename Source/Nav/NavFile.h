@@ -21,6 +21,6 @@ namespace Freeking
 
 	struct NavFile
 	{
-		static std::vector<NavNode> ReadNodes(const uint8_t* data);
+		static std::vector<NavNode> ReadNodes(const uint8_t* data, size_t size);
 	};
 }

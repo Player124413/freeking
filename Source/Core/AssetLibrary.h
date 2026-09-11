@@ -127,13 +127,20 @@ namespace Freeking
 		inline const std::unordered_map<std::string, AssetPtr>& GetPathAssets() const { return _pathAssets; }
 		inline const std::unordered_map<std::string, AssetPtr>& GetSpecialAssets() const { return _specialAssets; }
 
+		// Drops cached path assets (shared owners keep their copies alive).
+		// Used when unloading a map so per-map assets don't pile up.
+		void Clear()
+		{
+			_pathAssets.clear();
+		}
+
 	protected:
 
 		virtual void UpdateLoaders() {}
 
-		template<class T> void AddLoader()
+		template<class LoaderT> void AddLoader()
 		{
-			_loaders.emplace_back(std::make_unique<T>());
+			_loaders.emplace_back(std::make_unique<LoaderT>());
 		}
 
 	private:

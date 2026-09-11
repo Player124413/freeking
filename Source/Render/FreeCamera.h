@@ -21,6 +21,10 @@ namespace Freeking
 		inline const Vector3f& GetViewModelOffset() const { return _viewModelOffset; }
 
 		void MoveTo(const Vector3f& position);
+		// Places the player feet at "feetPosition" and faces "yawDegrees".
+		void Teleport(const Vector3f& feetPosition, float yawDegrees);
+		bool IsNoclip() const { return _noclip; }
+		void SetNoclip(bool noclip) { _noclip = noclip; }
 		void Move(const Vector3f& force, float dt);
 		void LookDelta(float x, float y);
 

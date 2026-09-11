@@ -2,6 +2,7 @@
 
 #include "SceneEntity.h"
 #include "EnumFlags.h"
+#include <memory>
 
 namespace Freeking
 {
@@ -40,6 +41,6 @@ namespace Freeking::Entity::Target
         float _volume;
         EnumFlags<SpawnFlags> _spawnFlags;
 
-        AudioClip* _audioClip;
+        std::shared_ptr<AudioClip> _audioClip;
     };
 }

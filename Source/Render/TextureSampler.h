@@ -1,6 +1,6 @@
 #pragma once
 
-#include <glad/gl.h>
+#include "GLCompat.h"
 #include <unordered_map>
 #include <memory>
 #include <functional>

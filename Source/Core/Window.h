@@ -28,6 +28,13 @@ namespace Freeking
 	{
 	public:
 
+		// Must be called before constructing the Window. On desktop the
+		// default is 4x MSAA, on Android MSAA is off by default (big mobile
+		// GPUs cost) and can be enabled from the settings (takes effect on
+		// next launch).
+		static void SetMSAASamples(int samples) { _msaaSamples = samples; }
+		static int GetMSAASamples() { return _msaaSamples; }
+
 		Window(const std::string& title, int width, int height);
 
 		operator SDL_Window* ()
@@ -43,9 +50,13 @@ namespace Freeking
 		const std::string GetTitle() const;
 		void SetTitle(const std::string&);
 
+		void GetDrawableSize(int& width, int& height) const;
+
 		void Swap();
 
 	private:
+
+		static int _msaaSamples;
 
 		std::unique_ptr<SDL_Window, SDLDestroyer> _window;
 		std::unique_ptr<SDL_Renderer, SDLDestroyer> _renderer;

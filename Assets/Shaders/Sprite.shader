@@ -40,7 +40,7 @@ out vec4 fragColor;
 
 void main()
 {
-	vec4 textureColor = texture2D(texture, vert.texcoord);
+	vec4 textureColor = texture(texture, vert.texcoord);
 	fragColor = textureColor * vert.color;
 }
 
