@@ -1,0 +1,6 @@
+// Top-level build file for the Freeking Android port:
+// a game-data launcher + the SDL2/GLES3 engine (see app/src/main/jni).
+
+plugins {
+    id("com.android.application") version "8.5.2" apply false
+}

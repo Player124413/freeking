@@ -1,5 +1,6 @@
 #include "Paths.h"
 #include "ThirdParty/ValveFileVDF/vdf_parser.hpp"
+#include <cstdlib>
 
 #ifdef _WIN32
 #include <Windows.h>
@@ -37,9 +38,35 @@ namespace Freeking
 	std::filesystem::path Paths::SteamDir()
 	{
 		static std::filesystem::path dir;
+		static bool probed = false;
 
-		if (dir.empty())
+		if (!probed)
 		{
+			probed = true;
+#if defined(__linux__) || defined(__APPLE__)
+			if (const char* home = std::getenv("HOME"))
+			{
+				std::error_code ec;
+				std::filesystem::path candidates[] =
+				{
+#ifdef __APPLE__
+					std::filesystem::path(home) / "Library/Application Support/Steam",
+#else
+					std::filesystem::path(home) / ".steam/steam",
+					std::filesystem::path(home) / ".local/share/Steam",
+#endif
+				};
+
+				for (const auto& candidate : candidates)
+				{
+					if (std::filesystem::exists(candidate / "steamapps/libraryfolders.vdf", ec))
+					{
+						dir = candidate;
+						break;
+					}
+				}
+			}
+#endif
 #ifdef _WIN32
 			HKEY key;
 			TCHAR value[1024];
@@ -58,12 +85,84 @@ namespace Freeking
 		return dir;
 	}
 
+	static bool LooksLikeKingpinDir(const std::filesystem::path& dir)
+	{
+		if (dir.empty())
+		{
+			return false;
+		}
+
+		std::error_code ec;
+		if (std::filesystem::is_directory(dir / "main", ec))
+		{
+			return true;
+		}
+
+		for (int i = 0; i <= 9; ++i)
+		{
+			if (std::filesystem::exists(dir / ("Pak" + std::to_string(i) + ".pak"), ec) ||
+				std::filesystem::exists(dir / ("pak" + std::to_string(i) + ".pak"), ec) ||
+				std::filesystem::exists(dir / ("main/Pak" + std::to_string(i) + ".pak"), ec) ||
+				std::filesystem::exists(dir / ("main/pak" + std::to_string(i) + ".pak"), ec))
+			{
+				return true;
+			}
+		}
+
+		return false;
+	}
+
 	std::filesystem::path Paths::KingpinDir()
 	{
 		static std::filesystem::path dir;
+		static bool probed = false;
 
-		if (dir.empty())
+		if (probed)
 		{
+			return dir;
+		}
+
+		probed = true;
+
+#ifdef __ANDROID__
+		// The launcher copies the user's game files here.
+		auto external = AndroidExternalStorage();
+		if (!external.empty() && LooksLikeKingpinDir(external / "kingpin"))
+		{
+			dir = external / "kingpin";
+		}
+
+		return dir;
+#else
+		// Explicit override wins everywhere.
+		if (const char* env = std::getenv("FREEKING_KINGPIN_DIR"))
+		{
+			if (LooksLikeKingpinDir(env))
+			{
+				dir = env;
+
+				return dir;
+			}
+		}
+
+		// Next to the executable / working directory.
+		{
+			std::error_code ec;
+			auto cwd = std::filesystem::current_path(ec);
+			if (LooksLikeKingpinDir(cwd / "kingpin"))
+			{
+				dir = cwd / "kingpin";
+
+				return dir;
+			}
+
+			if (LooksLikeKingpinDir(cwd))
+			{
+				dir = cwd;
+
+				return dir;
+			}
+		}
 #ifdef _WIN32
 			HKEY key;
 			TCHAR value[1024];
@@ -80,8 +179,10 @@ namespace Freeking
 			{
 				dir = SteamGameDir(38430);
 			}
+#else
+			dir = SteamGameDir(38430);
 #endif
-		}
+#endif
 
 		return dir;
 	}
@@ -149,14 +250,9 @@ namespace Freeking
 	std::filesystem::path Paths::AssetsDir()
 	{
 #ifdef __ANDROID__
-		// Copied out of the APK by the launcher on first run.
-		auto internal = AndroidInternalStorage();
-		if (!internal.empty())
-		{
-			return internal / "Assets";
-		}
-
-		return {};
+		// Engine assets are copied out of the APK by the launcher on first run.
+		// The APK assets mirror the repo Assets/ tree at internal-storage root.
+		return AndroidInternalStorage();
 #else
 		std::error_code ec;
 		return std::filesystem::current_path(ec) / "Assets";

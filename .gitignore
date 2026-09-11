@@ -43,3 +43,9 @@ packages.config
 
 # cmake build directory
 /build/
+
+# Android (Gradle)
+/android/.gradle/
+/android/build/
+/android/app/build/
+/android/local.properties

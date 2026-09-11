@@ -1,0 +1,119 @@
+plugins {
+    id("com.android.application")
+}
+
+// SDL2 source is downloaded once per clean build into app/build/sdl-src and
+// shared between the Java side (SDLActivity) and the native side (CMake).
+// Versions are tried in order so a yanked/moved tag does not break the build.
+def sdlVersions = ["2.30.0", "2.28.5"]
+def sdlDir = layout.buildDirectory.dir("sdl-src").get().asFile
+
+tasks.register("fetchSdl") {
+    outputs.dir(sdlDir)
+
+    doLast {
+        if (new File(sdlDir, "CMakeLists.txt").exists()) {
+            return
+        }
+
+        sdlDir.mkdirs()
+        Exception lastError = null
+
+        for (v in sdlVersions) {
+            File tgz = new File(sdlDir, "sdl.tgz")
+            File tmp = new File(sdlDir, "tmp-extract")
+            try {
+                new URL("https://github.com/libsdl-org/SDL/archive/refs/tags/release-${v}.tar.gz")
+                    .withInputStream { i -> tgz.withOutputStream { it << i } }
+                delete(tmp)
+                copy {
+                    from(tarTree(tgz))
+                    into(tmp)
+                }
+                copy {
+                    from(new File(tmp, "SDL-release-${v}"))
+                    into(sdlDir)
+                }
+                delete(tmp, tgz)
+                if (!new File(sdlDir, "CMakeLists.txt").exists()) {
+                    throw new GradleException("SDL ${v} archive has unexpected layout")
+                }
+                logger.lifecycle("Using SDL ${v}")
+                return
+            } catch (Exception e) {
+                lastError = e
+                logger.warn("SDL ${v} download failed, trying next: ${e.message}")
+                delete(tmp, tgz)
+            }
+        }
+
+        throw new GradleException(
+            "Could not download SDL2 sources (tried ${sdlVersions}). " +
+            "Check network access to github.com. Last error: ${lastError}", lastError)
+    }
+}
+
+android {
+    namespace "org.freeking"
+    compileSdk 34
+    ndkVersion "26.3.11579264"
+
+    defaultConfig {
+        applicationId "org.freeking"
+        minSdk 21
+        targetSdk 34
+        versionCode 1
+        versionName "1.0.0"
+
+        externalNativeBuild {
+            cmake {
+                arguments "-DSDL_SRC_DIR=${sdlDir.absolutePath}",
+                          "-DANDROID_STL=c++_shared"
+                cppFlags "-std=c++17"
+            }
+        }
+
+        ndk {
+            abiFilters "arm64-v8a", "armeabi-v7a", "x86_64"
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            shrinkResources false
+        }
+        debug {
+            jniDebuggable true
+        }
+    }
+
+    externalNativeBuild {
+        cmake {
+            path "src/main/jni/CMakeLists.txt"
+            version "3.22.1"
+        }
+    }
+
+    sourceSets {
+        named("main") {
+            // SDLActivity + helpers come from the downloaded SDL sources.
+            java.srcDirs("${sdlDir.absolutePath}/android-project/app/src/main/java")
+            // Engine assets (Fonts/Shaders/Textures) are packaged at APK assets root.
+            assets.srcDirs("../../Assets")
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = "UTF-8"
+}
+}
+
+// Native build + Java compile both need SDL unpacked first.
+tasks.named("preBuild") { dependsOn("fetchSdl") }

@@ -49,7 +49,6 @@ target_link_libraries(${PROJECT_NAME}
   PRIVATE
     SDL2::SDL2
     OpenAL::OpenAL
-    fmt::fmt
   )
 
 include_directories(ThirdParty/glad/include)
@@ -78,17 +77,25 @@ endif()
 
 source_group(TREE ${CMAKE_CURRENT_LIST_DIR} FILES ${FREEKING_SOURCES} ${FREEKING_HEADERS})
 
-# copy SDL2.dll & soft_oal.dll
+# copy dependency DLLs next to the exe (vcpkg/shared builds)
 if (MSVC)
-  function(windows_copy_files TARGET SOURCE_DIR DEST_DIR)
-    string(REPLACE "/" "\\\\" SOURCE_DIR ${SOURCE_DIR})
-    string(REPLACE "/" "\\\\" DEST_DIR ${DEST_DIR})
-    add_custom_command(TARGET ${TARGET} POST_BUILD
-      COMMAND if not exist ${DEST_DIR} mkdir ${DEST_DIR} 2> nul
-      COMMAND robocopy ${SOURCE_DIR} ${DEST_DIR} ${ARGN} /NJH /NJS /NDL /NFL /NC /NS /NP /E || cmd /c "exit /b 0"
-    )
-  endfunction()
-
-    windows_copy_files(${PROJECT_NAME} ${SDL2_DLL_DIR} "${CMAKE_BINARY_DIR}/bin/$<CONFIG>/" SDL2.dll)
-    windows_copy_files(${PROJECT_NAME} "${CMAKE_SOURCE_DIR}/Assets/" "${CMAKE_BINARY_DIR}/bin/$<CONFIG>/Assets")
+  foreach(_dep SDL2::SDL2 OpenAL::OpenAL)
+    if (TARGET ${_dep})
+      get_target_property(_loc ${_dep} IMPORTED_LOCATION_RELEASE)
+      if (NOT _loc OR _loc MATCHES "NOTFOUND")
+        get_target_property(_loc ${_dep} IMPORTED_LOCATION)
+      endif()
+      if (_loc AND NOT _loc MATCHES "NOTFOUND" AND _loc MATCHES "\\.dll$")
+        add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+          COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            ${_loc} $<TARGET_FILE_DIR:${PROJECT_NAME}>)
+      endif()
+    endif()
+  endforeach()
 endif()
+
+# Ship engine assets next to the binary on every platform.
+add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+  COMMAND ${CMAKE_COMMAND} -E copy_directory
+    "${CMAKE_SOURCE_DIR}/Assets"
+    "$<TARGET_FILE_DIR:${PROJECT_NAME}>/Assets")

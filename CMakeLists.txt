@@ -41,7 +41,6 @@ mark_as_advanced(_CXX_FILESYSTEM_HAVE_EXPERIMENTAL_HEADER)
 # Dependencies
 find_package(SDL2 REQUIRED)
 find_package(OpenAL REQUIRED)
-find_package(fmt REQUIRED)
 
 # Wrap OpenAL Soft in an interface
 if (OPENAL_FOUND AND NOT TARGET OpenAL::OpenAL)
