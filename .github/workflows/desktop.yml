@@ -41,7 +41,8 @@ jobs:
           if [ $CODE -ne 0 ]; then
             tail -30 configure.log | sed -e 's/%/%25/g' -e 's/\r/%0D/g' | sed ':a;N;$!ba;s/\n/%0A/g' | head -c 6000 > /tmp/cfg_msg.txt
             echo "::error::configure-tail:%0A$(cat /tmp/cfg_msg.txt)"
-            tail -5 configure.log
+          fi
+          tail -5 configure.log
           exit $CODE
         env:
           CMAKE_PREFIX_PATH: /opt/homebrew:/usr/local
@@ -55,7 +56,8 @@ jobs:
           if [ $CODE -ne 0 ]; then
             tail -30 build.log | sed -e 's/%/%25/g' -e 's/\r/%0D/g' | sed ':a;N;$!ba;s/\n/%0A/g' | head -c 6000 > /tmp/bld_msg.txt
             echo "::error::build-tail:%0A$(cat /tmp/bld_msg.txt)"
-            tail -5 build.log
+          fi
+          tail -5 build.log
           exit $CODE
         shell: bash
 
