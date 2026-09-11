@@ -6,6 +6,12 @@ file(GLOB_RECURSE FREEKING_HEADERS "${CMAKE_CURRENT_LIST_DIR}/*.h")
 
 set(FREEKING_RC ${CMAKE_SOURCE_DIR}/resources/freeking.rc)
 set(FREEKING_MANIFEST ${CMAKE_SOURCE_DIR}/resources/freeking.exe.manifest)
+if (NOT EXISTS ${FREEKING_RC})
+  set(FREEKING_RC "")
+endif()
+if (NOT EXISTS ${FREEKING_MANIFEST})
+  set(FREEKING_MANIFEST "")
+endif()
 
 # imgui use GLAD loader
 add_definitions(-DIMGUI_IMPL_OPENGL_LOADER_GLAD)

@@ -34,12 +34,23 @@ jobs:
         run: brew install sdl2 openal-soft
 
       - name: Configure
-        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release 2>&1 | tee configure.log; exit ${PIPESTATUS[0]}
         env:
           CMAKE_PREFIX_PATH: /opt/homebrew:/usr/local
+        shell: bash
 
       - name: Build
-        run: cmake --build build --config Release -j
+        run: cmake --build build --config Release -j 2>&1 | tee build.log; exit ${PIPESTATUS[0]}
+        shell: bash
+
+      - name: Upload logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: logs-${{ runner.os }}
+          path: |
+            configure.log
+            build.log
 
       - name: Upload binary
         uses: actions/upload-artifact@v4

@@ -37,8 +37,16 @@ jobs:
         run: gradle --version --console=plain
 
       - name: Build APK
-        run: gradle assembleDebug --console=plain --stacktrace
+        run: gradle assembleDebug --console=plain --stacktrace 2>&1 | tee ../gradle.log; exit ${PIPESTATUS[0]}
         working-directory: android
+        shell: bash
+
+      - name: Upload log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: logs-android
+          path: gradle.log
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
