@@ -37,7 +37,20 @@ jobs:
         run: gradle --version --console=plain
 
       - name: Build APK
-        run: gradle assembleDebug --console=plain --stacktrace 2>&1 | tee ../gradle.log; exit ${PIPESTATUS[0]}
+        run: |
+          set +e
+          gradle assembleDebug --console=plain --stacktrace > ../gradle.log 2>&1
+          CODE=$?
+          if [ $CODE -ne 0 ]; then
+            grep -B2 -A15 "What went wrong" ../gradle.log | head -50 | while IFS= read -r line; do
+              echo "::error::gradle: $line"
+            done
+            grep -iB2 -A8 "^e: \|error:" ../gradle.log | head -40 | while IFS= read -r line; do
+              echo "::error::gradle: $line"
+            done
+          fi
+          tail -5 ../gradle.log
+          exit $CODE
         working-directory: android
         shell: bash
 

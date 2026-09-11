@@ -32,6 +32,6 @@
             android:screenOrientation="landscape"
             android:launchMode="singleTask"
             android:hardwareAccelerated="true"
-            android:configChanges="keyboard|keyboardHidden|orientation|screenSize|screenLayout|smallestScreenSize|uiMode|density|fontScale" />
+            android:configChanges="keyboard|keyboardHidden|orientation|screenSize|screenLayout|smallestScreenSize" />
     </application>
 </manifest>

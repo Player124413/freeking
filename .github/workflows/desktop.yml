@@ -34,13 +34,33 @@ jobs:
         run: brew install sdl2 openal-soft
 
       - name: Configure
-        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release 2>&1 | tee configure.log; exit ${PIPESTATUS[0]}
+        run: |
+          set +e
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release > configure.log 2>&1
+          CODE=$?
+          if [ $CODE -ne 0 ]; then
+            grep -i -B3 -A10 "error" configure.log | head -60 | while IFS= read -r line; do
+              echo "::error::cmake-configure: $line"
+            done
+          fi
+          tail -5 configure.log
+          exit $CODE
         env:
           CMAKE_PREFIX_PATH: /opt/homebrew:/usr/local
         shell: bash
 
       - name: Build
-        run: cmake --build build --config Release -j 2>&1 | tee build.log; exit ${PIPESTATUS[0]}
+        run: |
+          set +e
+          cmake --build build --config Release -j > build.log 2>&1
+          CODE=$?
+          if [ $CODE -ne 0 ]; then
+            grep -i -B3 -A6 "error" build.log | head -60 | while IFS= read -r line; do
+              echo "::error::cmake-build: $line"
+            done
+          fi
+          tail -5 build.log
+          exit $CODE
         shell: bash
 
       - name: Upload logs on failure
