@@ -41,11 +41,21 @@ mark_as_advanced(_CXX_FILESYSTEM_HAVE_EXPERIMENTAL_HEADER)
 # Dependencies
 find_package(SDL2 REQUIRED)
 if (APPLE)
-  # Prefer Homebrew openal-soft over the deprecated system OpenAL.framework,
-  # whose headers use the <OpenAL/*.h> layout instead of <AL/*.h>.
-  set(CMAKE_FIND_FRAMEWORK LAST)
+  # Never take the deprecated system OpenAL.framework: its headers use the
+  # <OpenAL/*.h> layout while the engine includes <AL/*.h> (Homebrew).
+  set(CMAKE_FIND_FRAMEWORK NEVER)
 endif()
 find_package(OpenAL REQUIRED)
+
+# FindOpenAL points OPENAL_INCLUDE_DIR at the dir containing al.h
+# (.../include/AL), but the engine includes <AL/*.h>, so also expose the
+# parent directory. (On most setups this is redundant with ambient paths,
+# but e.g. Homebrew prefixes are not on the default search path.)
+if (OPENAL_INCLUDE_DIR MATCHES "[/\\](AL|OpenAL)$")
+  get_filename_component(_openal_parent "${OPENAL_INCLUDE_DIR}" DIRECTORY)
+  set_property(TARGET OpenAL::OpenAL APPEND PROPERTY
+    INTERFACE_INCLUDE_DIRECTORIES "${_openal_parent}")
+endif()
 
 # Wrap OpenAL Soft in an interface
 if (OPENAL_FOUND AND NOT TARGET OpenAL::OpenAL)
