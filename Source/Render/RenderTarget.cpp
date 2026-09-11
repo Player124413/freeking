@@ -52,19 +52,20 @@ namespace Freeking
 			std::cout << "GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT" << std::endl;
 			break;
 #ifndef __ANDROID__
+		// Desktop GL only: these enums do not exist in OpenGL ES.
 		case GL_FRAMEBUFFER_INCOMPLETE_DIMENSIONS_EXT:
 			std::cout << "GL_FRAMEBUFFER_INCOMPLETE_DIMENSIONS_EXT" << std::endl;
 			break;
 		case GL_FRAMEBUFFER_INCOMPLETE_FORMATS_EXT:
 			std::cout << "GL_FRAMEBUFFER_INCOMPLETE_FORMATS_EXT" << std::endl;
 			break;
-#endif
 		case GL_FRAMEBUFFER_INCOMPLETE_DRAW_BUFFER:
 			std::cout << "GL_FRAMEBUFFER_INCOMPLETE_DRAW_BUFFER" << std::endl;
 			break;
 		case GL_FRAMEBUFFER_INCOMPLETE_READ_BUFFER:
 			std::cout << "GL_FRAMEBUFFER_INCOMPLETE_READ_BUFFER" << std::endl;
 			break;
+#endif
 		}
 
 		assert(status == GL_FRAMEBUFFER_COMPLETE);

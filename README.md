@@ -37,8 +37,8 @@ Works on Russian and English phones — the launcher UI follows the system langu
 
 **Touch controls**
 
-- Left stick: move · drag right side: look · buttons: fire / jump / crouch /
-  use / reload / weapon slots / flashlight / objectives / menu.
+- Left stick: move · drag anywhere: look · buttons: fire / jump / use /
+  run / fly (noclip) / menu, plus the EDIT button.
 - Open the pause menu (☰) → **Touch Layout (EDIT)** to move, resize,
   show/hide every control, or disable the touch UI entirely
   (for gamepad / mouse-and-keyboard play).
@@ -81,8 +81,8 @@ Point the game at your Kingpin install in any of these ways:
 
 ## Controls (desktop)
 
-WASD move · mouse look · LMB fire · E use · Space jump · C crouch ·
-R reload · 1–8 weapons · F flashlight · Tab objectives · Esc menu.
+WASD/arrows move · mouse look · LMB fire · E use · Space jump ·
+V toggle fly (noclip) · Esc menu · F1 debug overlay.
 
 ## License
 freeking is released as open source software under the [GPL v3](https://opensource.org/licenses/gpl-3.0.html)
