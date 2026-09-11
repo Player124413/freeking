@@ -39,11 +39,10 @@ jobs:
           cmake -S . -B build -DCMAKE_BUILD_TYPE=Release > configure.log 2>&1
           CODE=$?
           if [ $CODE -ne 0 ]; then
-            grep -i -B3 -A10 "error" configure.log | head -60 | while IFS= read -r line; do
-              echo "::error::cmake-configure: $line"
+            tail -60 configure.log | while IFS= read -r line; do
+              echo "::error::configure-tail: $line"
             done
-          fi
-          tail -5 configure.log
+            tail -5 configure.log
           exit $CODE
         env:
           CMAKE_PREFIX_PATH: /opt/homebrew:/usr/local
@@ -55,11 +54,10 @@ jobs:
           cmake --build build --config Release -j > build.log 2>&1
           CODE=$?
           if [ $CODE -ne 0 ]; then
-            grep -i -B3 -A6 "error" build.log | head -60 | while IFS= read -r line; do
-              echo "::error::cmake-build: $line"
+            tail -60 build.log | while IFS= read -r line; do
+              echo "::error::build-tail: $line"
             done
-          fi
-          tail -5 build.log
+            tail -5 build.log
           exit $CODE
         shell: bash
 
