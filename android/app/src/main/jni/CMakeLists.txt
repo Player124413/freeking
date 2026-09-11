@@ -35,6 +35,9 @@ list(FILTER FREEKING_SOURCES EXCLUDE REGEX ".*/ThirdParty/glad/.*")
 add_library(freeking SHARED ${FREEKING_SOURCES})
 
 target_include_directories(freeking PRIVATE
+    # Source root (desktop gets this via CMAKE_INCLUDE_CURRENT_DIR):
+    # covers "Audio/*.h", "Nav/*.h", "ThirdParty/imgui/*.h" includes.
+    "${FREEKING_SOURCE_DIR}"
     "${FREEKING_SOURCE_DIR}/ThirdParty/stb"
     "${FREEKING_SOURCE_DIR}/ThirdParty/json"
     "${FREEKING_SOURCE_DIR}/Bsp"
