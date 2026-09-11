@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include "VertexBinding.h"
 #include "VertexBuffer.h"
 #include "Quaternion.h"

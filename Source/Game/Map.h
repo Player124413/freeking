@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include "BspFile.h"
 #include "DynamicModel.h"
 #include "EntityLump.h"

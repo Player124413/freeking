@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include "BrushModelEntity.h"
 #include "EnumFlags.h"
 

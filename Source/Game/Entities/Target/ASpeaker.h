@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include "SceneEntity.h"
 #include "EnumFlags.h"
 #include <memory>

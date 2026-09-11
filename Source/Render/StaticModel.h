@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include "AssetLibrary.h"
 #include "Vector.h"
 #include "VertexBinding.h"

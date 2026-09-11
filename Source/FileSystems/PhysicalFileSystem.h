@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include "FileSystem.h"
 #include <filesystem>
 #include <unordered_map>

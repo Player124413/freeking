@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include "AssetLibrary.h"
 #include <unordered_map>
 #include <memory>

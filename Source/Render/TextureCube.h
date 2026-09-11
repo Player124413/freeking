@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include "Texture.h"
 #include "AssetLibrary.h"
 #include <array>

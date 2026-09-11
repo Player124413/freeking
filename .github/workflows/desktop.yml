@@ -54,8 +54,24 @@ jobs:
           cmake --build build --config Release --parallel 4 > build.log 2>&1
           CODE=$?
           if [ $CODE -ne 0 ]; then
-            tail -30 build.log | sed -e 's/%/%25/g' -e 's/\r/%0D/g' | sed ':a;N;$!ba;s/\n/%0A/g' | head -c 6000 > /tmp/bld_msg.txt
+            {
+              echo "exit=$CODE";
+              echo "--- compiler ---";
+              (c++ --version 2>&1 | head -3);
+              echo "--- cmake ---";
+              (cmake --version 2>&1 | head -2);
+              echo "--- disk ---";
+              (df -h . 2>&1 | head -4);
+              echo "--- build dir ---";
+              (ls build/ 2>&1 | head -5);
+              (find build -name "*.o" 2>/dev/null | wc -l);
+            } > /tmp/env.txt 2>&1
+            sed -e 's/%/%25/g' -e 's/\r/%0D/g' /tmp/env.txt | sed ':a;N;$!ba;s/\n/%0A/g' | head -c 4000 > /tmp/env_msg.txt
+            echo "::error::build-env:%0A$(cat /tmp/env_msg.txt)"
+            tail -100 build.log | sed -e 's/%/%25/g' -e 's/\r/%0D/g' | sed ':a;N;$!ba;s/\n/%0A/g' | head -c 6000 > /tmp/bld_msg.txt
             echo "::error::build-tail:%0A$(cat /tmp/bld_msg.txt)"
+            head -20 build.log | sed -e 's/%/%25/g' -e 's/\r/%0D/g' | sed ':a;N;$!ba;s/\n/%0A/g' | head -c 4000 > /tmp/bld_head.txt
+            echo "::error::build-head:%0A$(cat /tmp/bld_head.txt)"
           fi
           tail -5 build.log
           exit $CODE

@@ -1,6 +1,8 @@
 #pragma once
 
 #include "Vector.h"
+#include <cstddef>
+#include <cstdint>
 #include <vector>
 
 namespace Freeking
