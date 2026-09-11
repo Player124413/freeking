@@ -1,5 +1,7 @@
 #include "Util.h"
+#include <cerrno>
 #include <charconv>
+#include <cstdlib>
 #include <random>
 
 namespace Freeking
@@ -38,7 +40,25 @@ namespace Freeking
 
 	bool Util::TryParseFloat(const std::string& s, float& v)
 	{
-		return std::from_chars(s.data(), s.data() + s.size(), v, std::chars_format::general).ec == std::errc();
+		// Floating-point std::from_chars is missing from Android's libc++
+		// (NDK r26), so parse with strtof. Same contract: leading part must
+		// convert, overflow fails like result_out_of_range.
+		if (s.empty())
+		{
+			return false;
+		}
+
+		char* end = nullptr;
+		errno = 0;
+		float value = std::strtof(s.c_str(), &end);
+		if (end == s.c_str() || errno == ERANGE)
+		{
+			return false;
+		}
+
+		v = value;
+
+		return true;
 	}
 
 	bool Util::TryParseInt(const std::string& s, int& v)
