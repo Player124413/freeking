@@ -40,6 +40,11 @@ mark_as_advanced(_CXX_FILESYSTEM_HAVE_EXPERIMENTAL_HEADER)
 
 # Dependencies
 find_package(SDL2 REQUIRED)
+if (APPLE)
+  # Prefer Homebrew openal-soft over the deprecated system OpenAL.framework,
+  # whose headers use the <OpenAL/*.h> layout instead of <AL/*.h>.
+  set(CMAKE_FIND_FRAMEWORK LAST)
+endif()
 find_package(OpenAL REQUIRED)
 
 # Wrap OpenAL Soft in an interface
