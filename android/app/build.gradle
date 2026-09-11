@@ -113,7 +113,6 @@ android {
 tasks.withType(JavaCompile).configureEach {
     options.encoding = "UTF-8"
 }
-}
 
 // Native build + Java compile both need SDL unpacked first.
 tasks.named("preBuild") { dependsOn("fetchSdl") }
