@@ -1,5 +1,6 @@
 #include "Game.h"
 #include "CrashHandler.h"
+#include "Shader.h"
 #include "Window.h"
 #include "Input.h"
 #include "TouchControls.h"
@@ -31,6 +32,7 @@
 #include "BillboardBatch.h"
 #include "GLCompat.h"
 #include <iostream>
+#include <stdexcept>
 #include <cmath>
 #include <algorithm>
 
@@ -342,6 +344,30 @@ namespace Freeking
 	void Game::LoadMapSync(const std::string& mapName)
 	{
 		UnloadMap();
+
+		// Fail loud with the GPU's own error instead of a black world:
+		// without these shaders nothing 3D can render.
+		{
+			const std::shared_ptr<Shader> critical[] =
+			{
+				Shader::Library.Lightmapped,
+				Shader::Library.DynamicModel
+			};
+
+			std::string failures;
+			for (const auto& shader : critical)
+			{
+				if (shader == nullptr || !shader->IsValid())
+				{
+					failures += (shader == nullptr ? "(missing shader)\n" : shader->GetName() + ":\n" + shader->GetErrorLog() + "\n");
+				}
+			}
+
+			if (!failures.empty())
+			{
+				throw std::runtime_error("3D shaders failed on this GPU, cannot render the map:\n" + failures);
+			}
+		}
 
 		std::cout << "Loading map: " << mapName << std::endl;
 		SetCrashContext("loading map " + mapName);

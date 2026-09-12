@@ -28,7 +28,7 @@ void main()
 
 #ifdef FRAGMENT
 
-uniform sampler2D texture;
+uniform sampler2D diffuse;
 
 in VertexData
 {
@@ -40,7 +40,7 @@ out vec4 fragColor;
 
 void main()
 {
-	vec4 textureColor = texture(texture, vert.texcoord);
+	vec4 textureColor = texture(diffuse, vert.texcoord);
 	fragColor = textureColor * vert.color;
 }
 

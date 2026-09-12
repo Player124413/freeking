@@ -20,7 +20,7 @@ namespace Freeking
 		}
 
 		auto shader = std::make_shared<Shader>();
-		shader->Compile(std::string((char*)source.data(), source.size()));
+		shader->Compile(name, std::string((char*)source.data(), source.size()));
 
 		return shader;
 	}

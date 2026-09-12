@@ -28,7 +28,7 @@ void main()
 
 #ifdef FRAGMENT
 
-uniform sampler2D texture;
+uniform sampler2D diffuse;
 
 in VertexData
 {
@@ -45,7 +45,7 @@ float median(float r, float g, float b)
 
 void main()
 {
-	vec3 color = 1.0 - texture(texture, vert.texcoord).rgb;
+	vec3 color = 1.0 - texture(diffuse, vert.texcoord).rgb;
 	float sigDist = median(color.r, color.g, color.b) - 0.5;
 	float alpha = clamp(sigDist / fwidth(sigDist) + 0.5, 0.0, 1.0);
 	fragColor = vec4(vert.color.rgb, alpha * vert.color.a);

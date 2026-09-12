@@ -558,7 +558,7 @@ namespace Freeking
 
 			if (batchTexture != nullptr)
 			{
-				shader->SetParameterValue("texture", batchTexture);
+				shader->SetParameterValue("diffuse", batchTexture);
 			}
 
 			for (size_t i = basePos; i < searchPos; ++i)

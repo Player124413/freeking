@@ -1,16 +1,29 @@
 #include "Shader.h"
 #include <cstring>
+#include <cstdio>
 #include "Texture2D.h"
 #include "TextureBuffer.h"
 #include "TextureCube.h"
 #include "TextureSampler.h"
 #include "ShaderLoader.h"
+#include "Paths.h"
 #include <cassert>
 
 namespace Freeking
 {
 	void ShaderLibrary::Initialize()
 	{
+		// Fresh shader log every run; failures append below.
+		auto dir = Paths::UserDir();
+		if (!dir.empty())
+		{
+			std::string path = (dir / "shader.log").string();
+			if (FILE* file = std::fopen(path.c_str(), "w"))
+			{
+				std::fclose(file);
+			}
+		}
+
 		DebugLine = Get("Shaders/DebugLine.shader");
 		DynamicModel = Get("Shaders/DynamicModel.shader");
 		Lightmapped = Get("Shaders/Lightmapped.shader");
@@ -110,7 +123,21 @@ namespace Freeking
 
 	void Shader::Bind()
 	{
-		assert(_program != 0);
+		// A shader that failed to compile/link unbinds instead of
+		// aborting: subsequent draws become safe no-ops.
+		if (_program == 0)
+		{
+			if (!_bindWarned)
+			{
+				_bindWarned = true;
+				std::fprintf(stderr, "Shader::Bind: '%s' has no program (compile failed), skipping\n",
+					_name.empty() ? "?" : _name.c_str());
+			}
+
+			Unbind();
+
+			return;
+		}
 
 		if (_program != _activeProgramId)
 		{
@@ -135,7 +162,7 @@ namespace Freeking
 
 	void Shader::SetParameterValue(int id, int value)
 	{
-		assert(_program == _activeProgramId);
+		if (!IsBound()) { return; }
 
 		if (auto param = _intParameters.GetParameter(id);
 			param != nullptr && param->type == IntParameter::Type::Int)
@@ -151,7 +178,7 @@ namespace Freeking
 
 	void Shader::SetParameterValue(int id, float value)
 	{
-		assert(_program == _activeProgramId);
+		if (!IsBound()) { return; }
 
 		if (auto param = _floatParameters.GetParameter(id);
 			param != nullptr && param->type == FloatParameter::Type::Float)
@@ -167,7 +194,7 @@ namespace Freeking
 
 	void Shader::SetParameterValue(int id, const Vector2f& value)
 	{
-		assert(_program == _activeProgramId);
+		if (!IsBound()) { return; }
 
 		if (auto param = _floatParameters.GetParameter(id);
 			param != nullptr && param->type == FloatParameter::Type::Vec2)
@@ -183,7 +210,7 @@ namespace Freeking
 
 	void Shader::SetParameterValue(int id, const Vector3f& value)
 	{
-		assert(_program == _activeProgramId);
+		if (!IsBound()) { return; }
 
 		if (auto param = _floatParameters.GetParameter(id);
 			param != nullptr && param->type == FloatParameter::Type::Vec3)
@@ -199,7 +226,7 @@ namespace Freeking
 
 	void Shader::SetParameterValue(int id, const Vector4f& value)
 	{
-		assert(_program == _activeProgramId);
+		if (!IsBound()) { return; }
 
 		if (auto param = _floatParameters.GetParameter(id);
 			param != nullptr && param->type == FloatParameter::Type::Vec4)
@@ -215,7 +242,7 @@ namespace Freeking
 
 	void Shader::SetParameterValue(int id, const Matrix3x3& value)
 	{
-		assert(_program == _activeProgramId);
+		if (!IsBound()) { return; }
 
 		if (auto param = _matrixParameters.GetParameter(id);
 			param != nullptr && param->type == MatrixParameter::Type::Mat3)
@@ -231,7 +258,7 @@ namespace Freeking
 
 	void Shader::SetParameterValue(int id, const Matrix4x4& value)
 	{
-		assert(_program == _activeProgramId);
+		if (!IsBound()) { return; }
 
 		if (auto param = _matrixParameters.GetParameter(id);
 			param != nullptr && param->type == MatrixParameter::Type::Mat4)
@@ -262,7 +289,7 @@ namespace Freeking
 
 	void Shader::SetParameterValue(int id, const Texture2D* texture, const TextureSampler* sampler)
 	{
-		assert(_program == _activeProgramId);
+		if (!IsBound()) { return; }
 
 		if (!texture)
 		{
@@ -298,7 +325,7 @@ namespace Freeking
 
 	void Shader::SetParameterValue(int id, const TextureBuffer* texture)
 	{
-		assert(_program == _activeProgramId);
+		if (!IsBound()) { return; }
 
 		if (!texture)
 		{
@@ -314,7 +341,7 @@ namespace Freeking
 
 	void Shader::SetParameterValue(int id, const TextureCube* texture, const TextureSampler* sampler)
 	{
-		assert(_program == _activeProgramId);
+		if (!IsBound()) { return; }
 
 		if (!texture)
 		{
@@ -499,9 +526,18 @@ namespace Freeking
 		}
 	}
 
-	static GLuint CreateSubShader(GLenum type, const std::string& source, const std::string& defines)
+	static GLuint CreateSubShader(GLenum type, const std::string& source, const std::string& defines,
+		const char* stageName, std::string& errorLog)
 	{
+		(void)stageName;
+
 		GLuint shader = glCreateShader(type);
+		if (shader == 0)
+		{
+			errorLog += "glCreateShader failed\n";
+
+			return 0;
+		}
 
 #ifdef __ANDROID__
 		// OpenGL ES 3.0 shading language. Default float/int precision is
@@ -530,10 +566,25 @@ namespace Freeking
 			GLint infoLogLen = 0;
 			glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &infoLogLen);
 
-			char* infoLog = new char[infoLogLen];
-			glGetShaderInfoLog(shader, infoLogLen, &infoLogLen, infoLog);
-			std::fprintf(stderr, "Shader compile errors:\n%s\n", infoLog);
-			delete[] infoLog;
+			std::string infoLog;
+			if (infoLogLen > 1)
+			{
+				infoLog.resize(static_cast<size_t>(infoLogLen));
+				glGetShaderInfoLog(shader, infoLogLen, &infoLogLen, infoLog.data());
+				while (!infoLog.empty() && infoLog.back() == '\0')
+				{
+					infoLog.pop_back();
+				}
+			}
+
+			if (infoLog.empty())
+			{
+				infoLog = "(no info log)";
+			}
+
+			std::fprintf(stderr, "Shader compile errors:\n%s\n", infoLog.c_str());
+			errorLog += infoLog;
+			errorLog += '\n';
 
 			glDeleteShader(shader);
 
@@ -543,14 +594,42 @@ namespace Freeking
 		return shader;
 	}
 
-	void Shader::Compile(const std::string& source)
+	static void AppendShaderLogFile(const std::string& name, const std::string& errorLog)
 	{
+		auto dir = Paths::UserDir();
+		if (dir.empty())
+		{
+			return;
+		}
+
+		std::string path = (dir / "shader.log").string();
+		if (FILE* file = std::fopen(path.c_str(), "a"))
+		{
+			std::fprintf(file, "=== %s ===\n%s\n", name.c_str(), errorLog.c_str());
+			std::fclose(file);
+		}
+	}
+
+	void Shader::Compile(const std::string& name, const std::string& source)
+	{
+		_name = name;
+		_errorLog.clear();
+
 		_program = glCreateProgram();
 
-		assert(_program != 0);
+		if (_program == 0)
+		{
+			_errorLog = "glCreateProgram failed (no GL context?)";
+			std::fprintf(stderr, "Shader '%s': %s\n", _name.c_str(), _errorLog.c_str());
+			AppendShaderLogFile(_name, _errorLog);
 
-		GLuint vertexShader = CreateSubShader(GL_VERTEX_SHADER, source.c_str(), "#define VERTEX\n");
-		GLuint fragmentShader = CreateSubShader(GL_FRAGMENT_SHADER, source.c_str(), "#define FRAGMENT\n");
+			return;
+		}
+
+		std::string vertexLog;
+		std::string fragmentLog;
+		GLuint vertexShader = CreateSubShader(GL_VERTEX_SHADER, source.c_str(), "#define VERTEX\n", "vertex", vertexLog);
+		GLuint fragmentShader = CreateSubShader(GL_FRAGMENT_SHADER, source.c_str(), "#define FRAGMENT\n", "fragment", fragmentLog);
 
 		if (vertexShader == 0 || fragmentShader == 0)
 		{
@@ -558,6 +637,18 @@ namespace Freeking
 			if (fragmentShader != 0) glDeleteShader(fragmentShader);
 			glDeleteProgram(_program);
 			_program = 0;
+
+			if (vertexShader == 0)
+			{
+				_errorLog += "[vertex]\n" + vertexLog;
+			}
+			if (fragmentShader == 0)
+			{
+				_errorLog += "[fragment]\n" + fragmentLog;
+			}
+
+			std::fprintf(stderr, "Shader '%s' compile failed\n", _name.c_str());
+			AppendShaderLogFile(_name, _errorLog);
 
 			return;
 		}
@@ -572,18 +663,33 @@ namespace Freeking
 		if (linkStatus == GL_FALSE)
 		{
 			GLint infoLogLen = 0;
-			glGetShaderiv(_program, GL_INFO_LOG_LENGTH, &infoLogLen);
+			glGetProgramiv(_program, GL_INFO_LOG_LENGTH, &infoLogLen);
 
-			char* infoLog = new char[infoLogLen];
-			glGetProgramInfoLog(_program, infoLogLen, &infoLogLen, infoLog);
-			std::fprintf(stderr, "Shader linking errors:\n%s\n", infoLog);
-			delete[] infoLog;
+			std::string infoLog;
+			if (infoLogLen > 1)
+			{
+				infoLog.resize(static_cast<size_t>(infoLogLen));
+				glGetProgramInfoLog(_program, infoLogLen, &infoLogLen, infoLog.data());
+				while (!infoLog.empty() && infoLog.back() == '\0')
+				{
+					infoLog.pop_back();
+				}
+			}
+
+			if (infoLog.empty())
+			{
+				infoLog = "(no info log)";
+			}
+
+			std::fprintf(stderr, "Shader linking errors:\n%s\n", infoLog.c_str());
 
 			glDeleteProgram(_program);
 			glDeleteShader(vertexShader);
 			glDeleteShader(fragmentShader);
 
 			_program = 0;
+			_errorLog = "[link]\n" + infoLog + "\n";
+			AppendShaderLogFile(_name, _errorLog);
 
 			return;
 		}

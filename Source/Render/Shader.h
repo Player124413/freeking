@@ -72,7 +72,13 @@ namespace Freeking
 		Shader();
 		~Shader();
 
-		void Compile(const std::string& source);
+		void Compile(const std::string& name, const std::string& source);
+
+		// A shader whose program failed to compile/link reports invalid;
+		// Bind/draws become safe no-ops instead of aborting.
+		bool IsValid() const { return _program != 0; }
+		const std::string& GetName() const { return _name; }
+		const std::string& GetErrorLog() const { return _errorLog; }
 
 		void Bind();
 		void Unbind();
@@ -260,6 +266,8 @@ namespace Freeking
 
 	private:
 
+		bool IsBound() const { return _program != 0 && _program == _activeProgramId; }
+
 		void InitializeParameter(const std::string& name, GLint location, GLenum glType);
 
 		template <typename T>
@@ -313,6 +321,9 @@ namespace Freeking
 		};
 
 		GLuint _program;
+		std::string _name;
+		std::string _errorLog;
+		bool _bindWarned = false;
 		Parameters<FloatParameter> _floatParameters;
 		Parameters<IntParameter> _intParameters;
 		Parameters<MatrixParameter> _matrixParameters;

@@ -194,27 +194,23 @@ public class LauncherActivity extends Activity {
             return;
         }
         final File crash = new File(getFilesDir(), "last_crash.log");
-        if (!crash.exists()) {
+        final File shaderLog = new File(getFilesDir(), "shader.log");
+        boolean hasCrash = crash.exists();
+        boolean hasShaderLog = shaderLog.exists() && shaderLog.length() > 0;
+        if (!hasCrash && !hasShaderLog) {
             return;
         }
         crashShown = true;
         final boolean ru = isRussian();
-        String body;
-        try {
-            java.io.FileInputStream in = new java.io.FileInputStream(crash);
-            try {
-                java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
-                byte[] buf = new byte[4096];
-                int n;
-                while ((n = in.read(buf)) > 0) {
-                    out.write(buf, 0, n);
-                }
-                body = new String(out.toByteArray(), "UTF-8");
-            } finally {
-                in.close();
+        String body = "";
+        if (hasCrash) {
+            body += readTextFile(crash);
+        }
+        if (hasShaderLog) {
+            if (!body.isEmpty()) {
+                body += "\n\n";
             }
-        } catch (Exception e) {
-            body = "(unreadable: " + e.getMessage() + ")";
+            body += "--- shader.log ---\n" + readTextFile(shaderLog);
         }
         if (body.length() > 4000) {
             body = body.substring(0, 4000) + "\n…";
@@ -229,7 +225,9 @@ public class LauncherActivity extends Activity {
         scroll.addView(view);
 
         new AlertDialog.Builder(this)
-            .setTitle(ru ? "Прошлая сессия аварийно завершилась" : "Previous session crashed")
+            .setTitle(hasCrash
+                ? (ru ? "Прошлая сессия аварийно завершилась" : "Previous session crashed")
+                : (ru ? "Ошибки шейдеров" : "Shader errors"))
             .setMessage(ru
                 ? "Движок записал отчёт. Отправьте его разработчику вместе с названием карты:"
                 : "The engine wrote a crash report. Send it to the developer with the map name:")
@@ -238,6 +236,7 @@ public class LauncherActivity extends Activity {
                 @Override
                 public void onClick(android.content.DialogInterface d, int w) {
                     crash.delete();
+                    shaderLog.delete();
                     d.dismiss();
                 }
             })
@@ -257,6 +256,25 @@ public class LauncherActivity extends Activity {
                 }
             })
             .show();
+    }
+
+    private String readTextFile(File file) {
+        try {
+            java.io.FileInputStream in = new java.io.FileInputStream(file);
+            try {
+                java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+                byte[] buf = new byte[4096];
+                int n;
+                while ((n = in.read(buf)) > 0) {
+                    out.write(buf, 0, n);
+                }
+                return new String(out.toByteArray(), "UTF-8");
+            } finally {
+                in.close();
+            }
+        } catch (Exception e) {
+            return "(unreadable: " + e.getMessage() + ")";
+        }
     }
 
     private void setImportEnabled(boolean enabled) {
