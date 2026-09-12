@@ -15,6 +15,12 @@ set(CMAKE_CONFIGURATION_TYPES Debug Release RelWithDebInfo CACHE STRING INTERNAL
 
 project(freeking)
 
+# Honor <PackageName>_ROOT variables (e.g. OpenAL_ROOT pointing at
+# Homebrew) in find_package; required since the minimum version predates it.
+if(POLICY CMP0074)
+  cmake_policy(SET CMP0074 NEW)
+endif()
+
 # Configure C++17 standard
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
