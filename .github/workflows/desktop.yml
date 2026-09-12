@@ -33,7 +33,7 @@ jobs:
         if: runner.os == 'macOS'
         run: |
           brew install sdl2 openal-soft
-          echo "OPENAL_ROOT=$(brew --prefix openal-soft)" >> $GITHUB_ENV
+          echo "OpenAL_ROOT=$(brew --prefix openal-soft)" >> $GITHUB_ENV
           echo "::warning::openal-prefix=$(brew --prefix openal-soft 2>&1 | tr '\n' ' ')"
           echo "::warning::openal-files=$(ls $(brew --prefix openal-soft)/include/AL $(brew --prefix openal-soft)/lib 2>&1 | tr '\n' '|' | head -c 2000)"
 
