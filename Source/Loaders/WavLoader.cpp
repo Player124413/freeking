@@ -98,6 +98,13 @@ namespace Freeking
 
 			if (chunkId == 'atad')
 			{
+				// The data chunk cannot be larger than the file itself;
+				// reject corrupt sizes instead of attempting a gigabyte resize.
+				if (chunkSize == 0 || chunkSize > fileData.size())
+				{
+					return nullptr;
+				}
+
 				pcmData.clear();
 				pcmData.resize(chunkSize, 0);
 				stream.Read((uint8_t*)&pcmData[0], chunkSize);

@@ -14,6 +14,8 @@
 #include <cmath>
 #include <limits>
 #include <cstring>
+#include <climits>
+#include <stdexcept>
 
 namespace Freeking
 {
@@ -402,6 +404,12 @@ namespace Freeking
 		}
 	}
 
+	static std::string BspTextureName(const char name[32])
+	{
+		size_t len = strnlen(name, 32);
+		return std::string(name, len);
+	}
+
 	Map::Map(const std::string& mapName)
 	{
 		// Entities created below resolve brush models through Map::Current
@@ -417,7 +425,30 @@ namespace Freeking
 		Profiler pf;
 
 		_fileData = std::move(FileSystem::GetFileData("maps/" + mapName + ".bsp"));
+
+		// Validate before overlaying structs on raw bytes: a truncated or
+		// foreign file must produce an error page, not a segfault.
+		if (_fileData.size() < sizeof(BspHeader))
+		{
+			throw std::runtime_error("Map file is missing or truncated: " + mapName);
+		}
+
 		const BspFile& bspFile = BspFile::Create(_fileData.data());
+
+		if (!bspFile.IsValid())
+		{
+			throw std::runtime_error("Map file has bad magic/version: " + mapName);
+		}
+
+		for (const auto& lump : bspFile.Header.LumpsHeaders)
+		{
+			if (lump.Offset < 0 || lump.Length < 0 ||
+				static_cast<size_t>(lump.Length) > _fileData.size() ||
+				static_cast<size_t>(lump.Offset) > _fileData.size() - static_cast<size_t>(lump.Length))
+			{
+				throw std::runtime_error("Map file has corrupt lump table: " + mapName);
+			}
+		}
 
 		auto entities = bspFile.GetLumpArray<char>(bspFile.Header.Entities);
 		auto vertices = bspFile.GetLumpArray<Vector3f>(bspFile.Header.Vertices);
@@ -452,7 +483,7 @@ namespace Freeking
 		for (int i = 0; i < _textureInfo.Num(); ++i)
 		{
 			const auto& texInfo = _textureInfo[i];
-			auto textureName = std::string(texInfo.TextureName);
+			auto textureName = BspTextureName(texInfo.TextureName);
 
 			if (textureIds.find(textureName) == textureIds.end())
 			{
@@ -491,9 +522,25 @@ namespace Freeking
 			// Model 0 is always the static world geometry.
 			brushModel->Cullable = (modelIndex == 0);
 
+			if (model.FirstFace < 0 || model.NumFaces < 0 ||
+				model.NumFaces > faces.Num() || model.FirstFace > faces.Num() - model.NumFaces)
+			{
+				continue;
+			}
+
 			for (int faceIndex = model.FirstFace; faceIndex < (model.FirstFace + model.NumFaces); ++faceIndex)
 			{
+				if (!faces.IsValidIndex(faceIndex))
+				{
+					continue;
+				}
+
 				const auto& face = faces[faceIndex];
+				if (!_textureInfo.IsValidIndex(face.TextureInfo))
+				{
+					continue;
+				}
+
 				const auto& faceTextureInfo = _textureInfo[face.TextureInfo];
 
 				if ((faceTextureInfo.Flags[BspSurfaceFlags::NoDraw]) ||
@@ -508,7 +555,7 @@ namespace Freeking
 					continue;
 				}
 
-				std::string textureName(faceTextureInfo.TextureName);
+				std::string textureName = BspTextureName(faceTextureInfo.TextureName);
 				auto masked = (faceTextureInfo.Flags[BspSurfaceFlags::Masked]);
 				auto trans = (faceTextureInfo.Flags[BspSurfaceFlags::Trans33]) || (faceTextureInfo.Flags[BspSurfaceFlags::Trans66]);
 				auto textureId = textureIds[textureName];
@@ -552,10 +599,23 @@ namespace Freeking
 				std::vector<Vector2f> faceUVs;
 				faceUVs.resize(face.NumEdges);
 
+				if (!_planes.IsValidIndex(face.Plane))
+				{
+					continue;
+				}
+
 				bool faceValid = true;
 				for (int edgeIndex = 0; edgeIndex < face.NumEdges; ++edgeIndex)
 				{
-					const auto& faceEdge = faceEdges[face.FirstEdge + edgeIndex];
+					if (face.FirstEdge > static_cast<uint32_t>(INT_MAX) ||
+						!faceEdges.IsValidIndex(static_cast<int>(face.FirstEdge) + edgeIndex))
+					{
+						faceValid = false;
+
+						break;
+					}
+
+					const auto& faceEdge = faceEdges[static_cast<int>(face.FirstEdge) + edgeIndex];
 					int edgeAbs = faceEdge < 0 ? -faceEdge : faceEdge;
 					if (!edges.IsValidIndex(edgeAbs))
 					{
@@ -609,6 +669,13 @@ namespace Freeking
 					int lwidth = (int)(lmaxu - lminu + 1);
 					int lheight = (int)(lmaxv - lminv + 1);
 
+					// Corrupt UVs can produce absurd lightmap sizes; skip the
+					// face instead of reading past the lightmap lump.
+					if (lwidth < 1 || lheight < 1 || lwidth > 512 || lheight > 512)
+					{
+						continue;
+					}
+
 					for (int lightStyleIndex = 0; lightStyleIndex < 4; ++lightStyleIndex)
 					{
 						auto lightStyle = face.LightmapStyles[lightStyleIndex];
@@ -621,6 +688,12 @@ namespace Freeking
 
 						if (packingNode.has_value())
 						{
+							size_t styleNeed = static_cast<size_t>(lwidth * lheight) * 3u * (static_cast<size_t>(lightStyleIndex) + 1u);
+							if (static_cast<size_t>(face.LightmapOffset) + styleNeed > static_cast<size_t>(lightmapData.Num()))
+							{
+								break;
+							}
+
 							auto lightmapOffset = face.LightmapOffset + (((lwidth * lheight) * 3) * lightStyleIndex);
 							lightmapImage->Insert(packingNode->x, packingNode->y, lwidth, lheight, lightmapData.Data() + lightmapOffset);
 

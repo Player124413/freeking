@@ -15,6 +15,11 @@ namespace Freeking
 	{
 		if (auto buffer = FileSystem::GetFileData(name); !buffer.empty())
 		{
+			if (buffer.size() < sizeof(MD2Header))
+			{
+				return nullptr;
+			}
+
 			const auto& file = MD2File::Create(buffer.data());
 			if (!file.IsValid())
 			{

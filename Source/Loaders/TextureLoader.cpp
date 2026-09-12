@@ -21,9 +21,19 @@ namespace Freeking
 		if (auto buffer = FileSystem::GetFileData(name); !buffer.empty())
 		{
 			int imageWidth, imageHeight, imageChannels;
-			if (uint8_t* image = stbi_load_from_memory(
+			uint8_t* image = stbi_load_from_memory(
 				(uint8_t*)buffer.data(), (std::int32_t)buffer.size(),
-				&imageWidth, &imageHeight, &imageChannels, 0))
+				&imageWidth, &imageHeight, &imageChannels, 0);
+			if (image != nullptr && imageChannels != 3 && imageChannels != 4)
+			{
+				// Grayscale images would mismatch the RGB/RGBA upload below;
+				// reload converted to RGBA instead of over-reading in the driver.
+				stbi_image_free(image);
+				image = stbi_load_from_memory(
+					(uint8_t*)buffer.data(), (std::int32_t)buffer.size(),
+					&imageWidth, &imageHeight, &imageChannels, 4);
+			}
+			if (image != nullptr)
 			{
 				auto texture = std::make_shared<Texture2D>(
 					imageWidth, imageHeight,

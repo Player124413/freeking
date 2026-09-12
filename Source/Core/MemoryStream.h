@@ -3,6 +3,8 @@
 #include <vector>
 #include <cstdint>
 #include <cstdio>
+#include <cstring>
+#include <iterator>
 
 namespace Freeking
 {
@@ -24,9 +26,18 @@ namespace Freeking
 		template <typename T>
 		T Read()
 		{
-			uint8_t* ptr = &(*_position);
-			T value = *reinterpret_cast<T*>(ptr);
-			std::advance(_position, sizeof(T));
+			// Bounds-checked and alignment-safe (memcpy): truncated data
+			// yields zero and parks at EOF instead of crashing.
+			T value{};
+			if (static_cast<std::size_t>(std::distance(_position, _data.end())) >= sizeof(T))
+			{
+				std::memcpy(&value, &(*_position), sizeof(T));
+				std::advance(_position, sizeof(T));
+			}
+			else
+			{
+				_position = _data.end();
+			}
 
 			return value;
 		}

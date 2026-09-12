@@ -1,4 +1,5 @@
 #include "Game.h"
+#include "CrashHandler.h"
 #include "Window.h"
 #include "Input.h"
 #include "TouchControls.h"
@@ -318,6 +319,8 @@ namespace Freeking
 
 	void Game::UnloadMap()
 	{
+		ClearCrashContext();
+
 		// Clear first: if a Map constructor threw midway, Current may point
 		// at a dead object (the destructor never ran for it).
 		Map::Current = nullptr;
@@ -341,6 +344,7 @@ namespace Freeking
 		UnloadMap();
 
 		std::cout << "Loading map: " << mapName << std::endl;
+		SetCrashContext("loading map " + mapName);
 
 		auto map = std::make_shared<Map>(mapName);
 
@@ -479,6 +483,7 @@ namespace Freeking
 		}
 
 		_map = std::move(map);
+		SetCrashContext("playing map " + mapName);
 
 		if (hasSpawn)
 		{

@@ -39,6 +39,7 @@ public class LauncherActivity extends Activity {
 
     private boolean busy = false;
     private boolean assetsReady = false;
+    private boolean crashShown = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -183,6 +184,79 @@ public class LauncherActivity extends Activity {
             playButton.setEnabled(!busy);
         }
         setImportEnabled(!busy);
+        checkCrashLog();
+    }
+
+    // If the native engine died on a fatal signal it leaves
+    // <internal storage>/last_crash.log — surface it so the user can report it.
+    private void checkCrashLog() {
+        if (crashShown) {
+            return;
+        }
+        final File crash = new File(getFilesDir(), "last_crash.log");
+        if (!crash.exists()) {
+            return;
+        }
+        crashShown = true;
+        final boolean ru = isRussian();
+        String body;
+        try {
+            java.io.FileInputStream in = new java.io.FileInputStream(crash);
+            try {
+                java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+                byte[] buf = new byte[4096];
+                int n;
+                while ((n = in.read(buf)) > 0) {
+                    out.write(buf, 0, n);
+                }
+                body = new String(out.toByteArray(), "UTF-8");
+            } finally {
+                in.close();
+            }
+        } catch (Exception e) {
+            body = "(unreadable: " + e.getMessage() + ")";
+        }
+        if (body.length() > 4000) {
+            body = body.substring(0, 4000) + "\n…";
+        }
+        final String report = body;
+
+        final TextView view = new TextView(this);
+        view.setText(report);
+        view.setTextIsSelectable(true);
+        view.setPadding(dp(16), dp(8), dp(16), dp(8));
+        ScrollView scroll = new ScrollView(this);
+        scroll.addView(view);
+
+        new AlertDialog.Builder(this)
+            .setTitle(ru ? "Прошлая сессия аварийно завершилась" : "Previous session crashed")
+            .setMessage(ru
+                ? "Движок записал отчёт. Отправьте его разработчику вместе с названием карты:"
+                : "The engine wrote a crash report. Send it to the developer with the map name:")
+            .setView(scroll)
+            .setPositiveButton(ru ? "Очистить" : "Clear", new android.content.DialogInterface.OnClickListener() {
+                @Override
+                public void onClick(android.content.DialogInterface d, int w) {
+                    crash.delete();
+                    d.dismiss();
+                }
+            })
+            .setNegativeButton(ru ? "Закрыть" : "Dismiss", new android.content.DialogInterface.OnClickListener() {
+                @Override
+                public void onClick(android.content.DialogInterface d, int w) {
+                    d.dismiss();
+                }
+            })
+            .setNeutralButton(ru ? "Копировать" : "Copy", new android.content.DialogInterface.OnClickListener() {
+                @Override
+                public void onClick(android.content.DialogInterface d, int w) {
+                    android.content.ClipboardManager cm =
+                        (android.content.ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+                    cm.setPrimaryClip(android.content.ClipData.newPlainText("crash", report));
+                    d.dismiss();
+                }
+            })
+            .show();
     }
 
     private void setImportEnabled(boolean enabled) {

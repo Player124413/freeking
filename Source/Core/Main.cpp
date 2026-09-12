@@ -1,11 +1,14 @@
 #include <SDL.h>
 #include "Game.h"
+#include "CrashHandler.h"
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
 int main(int argc, char** argv)
 {
+	Freeking::InstallCrashHandlers();
+
 	try
 	{
 		Freeking::Game game(argc, argv);

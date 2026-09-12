@@ -15,6 +15,11 @@ namespace Freeking
 	{
 		if (auto buffer = FileSystem::GetFileData(name); !buffer.empty())
 		{
+			if (buffer.size() < sizeof(MDXHeader))
+			{
+				return nullptr;
+			}
+
 			const auto& file = MDXFile::Create(buffer.data());
 			if (!file.IsValid())
 			{
