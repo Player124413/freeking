@@ -1,6 +1,8 @@
 #include "Md2Loader.h"
 #include "DynamicModel.h"
 #include "Md2File.h"
+#include <cstring>
+#include <climits>
 
 namespace Freeking
 {
@@ -10,6 +12,26 @@ namespace Freeking
 
 		return false;
 	};
+
+	namespace
+	{
+		// Bounds-checked sequential reader: file offsets/counts come from
+		// untrusted data, so every read is validated against the buffer.
+		template<typename T>
+		const T* ReadArray(const void* base, size_t fileSize, uint32_t& pos, uint32_t count)
+		{
+			size_t need = sizeof(T) * static_cast<size_t>(count);
+			if (pos > fileSize || need > fileSize - pos)
+			{
+				return nullptr;
+			}
+
+			const T* ptr = reinterpret_cast<const T*>(static_cast<const char*>(base) + pos);
+			pos += static_cast<uint32_t>(need);
+
+			return ptr;
+		}
+	}
 
 	MD2Loader::AssetPtr MD2Loader::Load(const std::string& name) const
 	{
@@ -26,14 +48,30 @@ namespace Freeking
 				return nullptr;
 			}
 
+			const auto& header = file.Header;
+			if (header.NumFrames < 0 || header.NumVertices < 0 || header.NumCommands < 0 ||
+				header.NumSkins < 0)
+			{
+				return nullptr;
+			}
+
+			size_t fileSize = buffer.size();
 			auto mesh = std::make_shared<DynamicModel>();
 
-			uint32_t pos = file.Header.OffsetFrames;
-			for (int frameIndex = 0; frameIndex < file.Header.NumFrames; ++frameIndex)
+			uint32_t pos = static_cast<uint32_t>(header.OffsetFrames);
+			for (int frameIndex = 0; frameIndex < header.NumFrames; ++frameIndex)
 			{
-				auto frame = file.Read<MD2Frame>(pos, 1);
-				auto vertices = file.Read<MD2Vertex>(pos, file.Header.NumVertices);
-				std::string frameName((char*)frame->Name.data());
+				auto frame = ReadArray<MD2Frame>(&file, fileSize, pos, 1);
+				auto vertices = (frame != nullptr)
+					? ReadArray<MD2Vertex>(&file, fileSize, pos, static_cast<uint32_t>(header.NumVertices))
+					: nullptr;
+				if (frame == nullptr || vertices == nullptr)
+				{
+					return nullptr;
+				}
+
+				const char* nameChars = reinterpret_cast<const char*>(frame->Name.data());
+				std::string frameName(nameChars, strnlen(nameChars, frame->Name.size()));
 
 				mesh->FrameTransforms.push_back(
 					{
@@ -42,7 +80,7 @@ namespace Freeking
 						Vector3f(frame->Scale[0], frame->Scale[1], frame->Scale[2])
 					});
 
-				for (int vertexIndex = 0; vertexIndex < file.Header.NumVertices; ++vertexIndex)
+				for (int vertexIndex = 0; vertexIndex < header.NumVertices; ++vertexIndex)
 				{
 					const auto& vertex = vertices[vertexIndex];
 
@@ -56,25 +94,45 @@ namespace Freeking
 				}
 			}
 
-			mesh->SetFrameCount(file.Header.NumFrames);
-			mesh->SetFrameVertexCount(file.Header.NumVertices);
+			mesh->SetFrameCount(header.NumFrames);
+			mesh->SetFrameVertexCount(header.NumVertices);
 
 			uint32_t vertexOffset = 0;
 
-			pos = file.Header.OffsetCommands;
-			for (int commandIndex = 0; commandIndex < file.Header.NumCommands; ++commandIndex)
+			pos = static_cast<uint32_t>(header.OffsetCommands);
+			for (int commandIndex = 0; commandIndex < header.NumCommands; ++commandIndex)
 			{
-				auto command = file.Read<MD2Command>(pos, 1);
+				auto command = ReadArray<MD2Command>(&file, fileSize, pos, 1);
+				if (command == nullptr)
+				{
+					return nullptr;
+				}
+
 				if (command->TrisTypeNum == 0)
 				{
 					break;
+				}
+
+				if (command->TrisTypeNum == INT_MIN)
+				{
+					return nullptr;
 				}
 
 				auto numCommandVertices = abs(command->TrisTypeNum);
 
 				for (int commandVertexIndex = 0; commandVertexIndex < numCommandVertices; ++commandVertexIndex)
 				{
-					auto commandVertex = file.Read<MD2CommandVertex>(pos, 1);
+					auto commandVertex = ReadArray<MD2CommandVertex>(&file, fileSize, pos, 1);
+					if (commandVertex == nullptr)
+					{
+						return nullptr;
+					}
+
+					if (commandVertex->VertexIndex < 0 || commandVertex->VertexIndex >= header.NumVertices)
+					{
+						return nullptr;
+					}
+
 					Vector2f uv(commandVertex->TextureCoordinates[0], commandVertex->TextureCoordinates[1]);
 
 					mesh->Vertices.push_back(
@@ -109,12 +167,17 @@ namespace Freeking
 				vertexOffset += numCommandVertices;
 			}
 
-			pos = file.Header.OffsetSkins;
-			for (int skinIndex = 0; skinIndex < file.Header.NumSkins; ++skinIndex)
+			pos = static_cast<uint32_t>(header.OffsetSkins);
+			for (int skinIndex = 0; skinIndex < header.NumSkins; ++skinIndex)
 			{
-				const auto& skin = file.Read<MD2Skin>(pos, 1);
-				std::string skinName((char*)skin->Path.data());
-				mesh->Skins.push_back(skinName);
+				auto skin = ReadArray<MD2Skin>(&file, fileSize, pos, 1);
+				if (skin == nullptr)
+				{
+					return nullptr;
+				}
+
+				const char* pathChars = reinterpret_cast<const char*>(skin->Path.data());
+				mesh->Skins.emplace_back(pathChars, strnlen(pathChars, skin->Path.size()));
 			}
 
 			mesh->Commit();
